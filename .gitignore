@@ -1,0 +1,32 @@
+# 환경변수 (비밀번호, 시크릿 키)
+.env
+.env.local
+.env.production
+
+# Claude Code 가이드 (개인용)
+CLAUDE.md
+
+# Java / Spring Boot
+build/
+.gradle/
+*.class
+*.jar
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Node.js / React
+node_modules/
+dist/
+jobradar-frontend/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+logs/
