@@ -1,4 +1,4 @@
-package com.jobradar.jobradar_backend;
+package com.jobradar.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
