@@ -12,6 +12,7 @@ build/
 *.class
 *.jar
 application.properties
+application.yml
 
 # IntelliJ
 .idea/
