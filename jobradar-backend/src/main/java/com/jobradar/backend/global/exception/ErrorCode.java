@@ -8,9 +8,9 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // 공통
-    INVALID_INPUT_VALUE(HttpStatus., "입력값이 올바르지 않습니다."),
+    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
-    BAD_REQUEST
+
     // 회원
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 회원입니다."),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
