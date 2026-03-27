@@ -1,0 +1,11 @@
+/* Tailwind CSS의 기본 스타일, 컴포넌트, 유틸리티 클래스를 불러옴 */
+/* 이 세 줄이 없으면 Tailwind 클래스(예: text-blue-500)가 동작하지 않음 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* JobRadar 전역 스타일 */
+body {
+  background-color: #f5f5f5;
+  color: #1a1a1a;
+}
