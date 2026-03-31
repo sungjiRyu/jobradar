@@ -1,19 +1,47 @@
 package com.jobradar.backend.user.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.jobradar.backend.global.common.ApiResponse;
+import com.jobradar.backend.user.dto.SignupRequest;
+import com.jobradar.backend.user.dto.UpdateNicknameRequest;
+import com.jobradar.backend.user.dto.UserResponse;
+import com.jobradar.backend.user.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
-/**
- * 회원 컨트롤러
- *
- * [예정 API]
- * POST   /api/users/signup  - 회원가입
- * GET    /api/users/me      - 내 정보 조회
- * PUT    /api/users/me      - 내 정보 수정
- * DELETE /api/users/me      - 회원 탈퇴
- */
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
-    // 회원가입/로그인 API 작업 시 구현 예정
+
+    private final UserService userService;
+
+    /** POST /api/users/signup - 회원가입 */
+    @PostMapping("/signup")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
+        return ApiResponse.ok("회원가입이 완료되었습니다.", userService.signup(request));
+    }
+
+    /** GET /api/users/me - 내 정보 조회 */
+    @GetMapping("/me")
+    public ApiResponse<UserResponse> getMe(@AuthenticationPrincipal Long userId) {
+        return ApiResponse.ok(userService.getMe(userId));
+    }
+
+    /** PUT /api/users/me - 닉네임 수정 */
+    @PutMapping("/me")
+    public ApiResponse<UserResponse> updateMe(@AuthenticationPrincipal Long userId,
+                                              @Valid @RequestBody UpdateNicknameRequest request) {
+        return ApiResponse.ok(userService.updateMe(userId, request));
+    }
+
+    /** DELETE /api/users/me - 회원 탈퇴 */
+    @DeleteMapping("/me")
+    public ApiResponse<Void> withdraw(@AuthenticationPrincipal Long userId) {
+        userService.withdraw(userId);
+        return ApiResponse.ok("회원 탈퇴가 완료되었습니다.");
+    }
 }

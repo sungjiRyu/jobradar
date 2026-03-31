@@ -1,17 +1,68 @@
 package com.jobradar.backend.user.service;
 
+import com.jobradar.backend.global.exception.CustomException;
+import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.user.dto.SignupRequest;
+import com.jobradar.backend.user.dto.UpdateNicknameRequest;
+import com.jobradar.backend.user.dto.UserResponse;
+import com.jobradar.backend.user.entity.User;
+import com.jobradar.backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 회원 서비스
- *
- * [구현 예정]
- * - 회원가입
- * - 내 정보 조회
- * - 내 정보 수정
- * - 회원 탈퇴
- */
 @Service
+@RequiredArgsConstructor
 public class UserService {
-    // 회원가입/로그인 API 작업 시 구현 예정
+
+    private final UserRepository userRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final RedisTemplate<String, String> redisTemplate;
+
+    /** 회원가입 */
+    @Transactional
+    public UserResponse signup(SignupRequest request) {
+        // 이메일 중복 확인
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .nickname(request.getNickname())
+                .build();
+
+        return UserResponse.from(userRepository.save(user));
+    }
+
+    /** 내 정보 조회 */
+    @Transactional(readOnly = true)
+    public UserResponse getMe(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return UserResponse.from(user);
+    }
+
+    /** 닉네임 수정 */
+    @Transactional
+    public UserResponse updateMe(Long userId, UpdateNicknameRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        user.updateNickname(request.getNickname());
+        return UserResponse.from(user);
+    }
+
+    /** 회원 탈퇴 */
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // Redis에서 Refresh 토큰도 함께 삭제
+        redisTemplate.delete("refresh:" + userId);
+        userRepository.delete(user);
+    }
 }
