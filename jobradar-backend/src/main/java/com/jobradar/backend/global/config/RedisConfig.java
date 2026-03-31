@@ -1,19 +1,33 @@
 package com.jobradar.backend.global.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
  * Redis 설정
  *
  * [사용하는 곳]
- * 1. JWT 리프레시 토큰 저장
- * 2. 채용공고 목록 캐싱
- *
- * [구현 예정]
- * - RedisTemplate Bean 설정
- * - 직렬화/역직렬화 설정 (JSON)
+ * 1. JWT 리프레시 토큰 저장 → key: "refresh:{userId}", value: refreshToken
+ * 2. 채용공고 목록 캐싱 (추후 구현)
  */
 @Configuration
 public class RedisConfig {
-    // JWT + Redis 인증 작업 시 구현 예정
+
+    @Bean
+    public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+
+        // 키와 값을 모두 String으로 직렬화 (사람이 읽을 수 있는 형태로 Redis에 저장)
+        StringRedisSerializer serializer = new StringRedisSerializer();
+        template.setKeySerializer(serializer);
+        template.setValueSerializer(serializer);
+        template.setHashKeySerializer(serializer);
+        template.setHashValueSerializer(serializer);
+
+        return template;
+    }
 }
