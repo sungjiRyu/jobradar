@@ -34,8 +34,8 @@ public class AuthController {
 
     /** POST /api/auth/logout - 로그아웃 */
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@AuthenticationPrincipal Long userId) {
-        authService.logout(userId);
+    public ApiResponse<Void> logout(@AuthenticationPrincipal String email) {
+        authService.logout(email);
         return ApiResponse.ok("로그아웃 되었습니다.");
     }
 }

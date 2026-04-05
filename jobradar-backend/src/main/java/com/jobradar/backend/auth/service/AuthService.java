@@ -38,12 +38,12 @@ public class AuthService {
         }
 
         // 3. 토큰 생성
-        String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getRole().name());
-        String refreshToken = jwtProvider.generateRefreshToken(user.getId());
+        String accessToken = jwtProvider.generateAccessToken(user.getEmail(), user.getRole().name());
+        String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
 
-        // 4. Refresh 토큰을 Redis에 저장 (key: "refresh:{userId}", TTL: 7일)
+        // 4. Refresh 토큰을 Redis에 저장 (key: "refresh:{email}", TTL: 7일)
         redisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + user.getId(),
+                REFRESH_KEY_PREFIX + user.getEmail(),
                 refreshToken,
                 7, TimeUnit.DAYS
         );
@@ -58,25 +58,25 @@ public class AuthService {
         // 1. Refresh 토큰 유효성 검증 (만료/위변조 확인)
         jwtProvider.validateToken(refreshToken);
 
-        // 2. 토큰에서 userId 추출
-        Long userId = jwtProvider.getUserId(refreshToken);
+        // 2. 토큰에서 email 추출
+        String email = jwtProvider.getEmail(refreshToken);
 
         // 3. Redis에 저장된 토큰과 비교 (로그아웃 여부 확인)
-        String stored = redisTemplate.opsForValue().get(REFRESH_KEY_PREFIX + userId);
+        String stored = redisTemplate.opsForValue().get(REFRESH_KEY_PREFIX + email);
         if (stored == null || !stored.equals(refreshToken)) {
             throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
         // 4. 유저 조회 후 새 토큰 발급
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        String newAccessToken = jwtProvider.generateAccessToken(user.getId(), user.getRole().name());
-        String newRefreshToken = jwtProvider.generateRefreshToken(user.getId());
+        String newAccessToken = jwtProvider.generateAccessToken(user.getEmail(), user.getRole().name());
+        String newRefreshToken = jwtProvider.generateRefreshToken(user.getEmail());
 
         // 5. Redis에 새 Refresh 토큰으로 교체
         redisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + userId,
+                REFRESH_KEY_PREFIX + email,
                 newRefreshToken,
                 7, TimeUnit.DAYS
         );
@@ -85,7 +85,7 @@ public class AuthService {
     }
 
     /** 로그아웃: Redis에서 Refresh 토큰 삭제 */
-    public void logout(Long userId) {
-        redisTemplate.delete(REFRESH_KEY_PREFIX + userId);
+    public void logout(String email) {
+        redisTemplate.delete(REFRESH_KEY_PREFIX + email);
     }
 }

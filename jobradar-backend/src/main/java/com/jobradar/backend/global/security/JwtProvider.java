@@ -39,10 +39,10 @@ public class JwtProvider {
     }
 
     /** Access Token 생성 */
-    public String generateAccessToken(Long userId, String role) {
+    public String generateAccessToken(String email, String role) {
         Date now = new Date();
         return Jwts.builder()
-                .subject(String.valueOf(userId))
+                .subject(email)          // subject에 email 저장 (DB PK 노출 방지)
                 .claim("role", role)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + accessExpiration))
@@ -51,10 +51,10 @@ public class JwtProvider {
     }
 
     /** Refresh Token 생성 */
-    public String generateRefreshToken(Long userId) {
+    public String generateRefreshToken(String email) {
         Date now = new Date();
         return Jwts.builder()
-                .subject(String.valueOf(userId))
+                .subject(email)          // subject에 email 저장 (DB PK 노출 방지)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshExpiration))
                 .signWith(getSigningKey())
@@ -70,9 +70,9 @@ public class JwtProvider {
                 .getPayload();
     }
 
-    /** 토큰에서 userId 추출 */
-    public Long getUserId(String token) {
-        return Long.valueOf(parseClaims(token).getSubject());
+    /** 토큰에서 email 추출 */
+    public String getEmail(String token) {
+        return parseClaims(token).getSubject();
     }
 
     /**

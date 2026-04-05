@@ -7,17 +7,15 @@ import lombok.Getter;
 @Getter
 public class UserResponse {
 
-    private final Long id;
     private final String email;
     private final String nickname;
 
-    private UserResponse(Long id, String email, String nickname) {
-        this.id = id;
+    private UserResponse(String email, String nickname) {
         this.email = email;
         this.nickname = nickname;
     }
 
     public static UserResponse from(User user) {
-        return new UserResponse(user.getId(), user.getEmail(), user.getNickname());
+        return new UserResponse(user.getEmail(), user.getNickname());
     }
 }

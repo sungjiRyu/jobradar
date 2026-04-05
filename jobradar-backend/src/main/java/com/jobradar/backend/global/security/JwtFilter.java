@@ -47,15 +47,15 @@ public class JwtFilter extends OncePerRequestFilter {
             try {
                 jwtProvider.validateToken(token);
 
-                // 토큰에서 userId, role 추출
-                Long userId = jwtProvider.getUserId(token);
+                // 토큰에서 email, role 추출
+                String email = jwtProvider.getEmail(token);
                 Claims claims = jwtProvider.parseClaims(token);
                 String role = claims.get("role", String.class);
 
                 // Spring Security에 "이 사용자는 인증됨"을 알림
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                userId,                                         // principal (컨트롤러에서 꺼낼 수 있음)
+                                email,                                          // principal (컨트롤러에서 꺼낼 수 있음)
                                 null,                                           // credentials (비밀번호 - 이미 검증됐으므로 null)
                                 List.of(new SimpleGrantedAuthority("ROLE_" + role))  // 권한 목록
                         );

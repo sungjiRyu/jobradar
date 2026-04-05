@@ -2,6 +2,7 @@ package com.jobradar.backend.user.service;
 
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.user.dto.ChangePasswordRequest;
 import com.jobradar.backend.user.dto.SignupRequest;
 import com.jobradar.backend.user.dto.UpdateNicknameRequest;
 import com.jobradar.backend.user.dto.UserResponse;
@@ -40,29 +41,44 @@ public class UserService {
 
     /** 내 정보 조회 */
     @Transactional(readOnly = true)
-    public UserResponse getMe(Long userId) {
-        User user = userRepository.findById(userId)
+    public UserResponse getMe(String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return UserResponse.from(user);
     }
 
     /** 닉네임 수정 */
     @Transactional
-    public UserResponse updateMe(Long userId, UpdateNicknameRequest request) {
-        User user = userRepository.findById(userId)
+    public UserResponse updateMe(String email, UpdateNicknameRequest request) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         user.updateNickname(request.getNickname());
         return UserResponse.from(user);
     }
 
+    /** 비밀번호 변경 */
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 현재 비밀번호가 맞는지 확인 (본인 인증)
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 새 비밀번호를 암호화하여 저장
+        user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+    }
+
     /** 회원 탈퇴 */
     @Transactional
-    public void withdraw(Long userId) {
-        User user = userRepository.findById(userId)
+    public void withdraw(String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // Redis에서 Refresh 토큰도 함께 삭제
-        redisTemplate.delete("refresh:" + userId);
+        redisTemplate.delete("refresh:" + email);
         userRepository.delete(user);
     }
 }
