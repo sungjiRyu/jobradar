@@ -8,10 +8,12 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /** 채용공고 엔티티 */
 @Entity
-@Table(name = "jobs")
+@Table(name = "job_posts")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Job {
@@ -21,41 +23,46 @@ public class Job {
     private Long id;
 
     @Column(nullable = false)
-    private String company; // 회사명
+    private String company;       // 회사명
 
     @Column(nullable = false)
-    private String title; // 공고 제목
+    private String title;         // 공고 제목
 
     @Column(columnDefinition = "TEXT")
-    private String description; // 공고 상세 내용
+    private String description;   // 공고 상세 내용
 
     @Column(nullable = false, length = 50)
-    private String location; // 근무 지역 (예: 서울, 판교)
+    private String location;      // 근무 지역 (예: 서울, 판교)
 
     @Column(length = 50)
     private String experienceLevel; // 경력 구분 (신입, 경력, 무관)
 
     @Column(length = 50)
-    private String employmentType; // 고용 형태 (정규직, 계약직, 인턴)
+    private String employmentType;  // 고용 형태 (정규직, 계약직, 인턴)
 
-    /**
-     * 기술스택 태그 (쉼표 구분 문자열로 저장)
-     * 예) "Java, Spring Boot, MySQL, Redis"
-     */
-    @Column(columnDefinition = "TEXT")
-    private String techStack;
-
-    private LocalDate deadline; // 지원 마감일 (null이면 상시채용)
+    private LocalDate deadline;   // 지원 마감일 (null이면 상시채용)
 
     @Column(nullable = false)
-    private String sourceUrl; // 원본 공고 URL
+    private String sourceUrl;     // 원본 공고 URL
 
     @Column(nullable = false, length = 30)
-    private String sourceSite; // 출처 사이트 (예: 사람인, 잡코리아, 원티드)
+    private String sourceSite;    // 출처 사이트 (사람인, 잡코리아, 원티드 등)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private JobStatus status; // 공고 상태
+    private JobStatus status;     // 공고 상태 (ACTIVE: 진행 중, CLOSED: 마감)
+
+    @Column(name = "view_count", columnDefinition = "INT DEFAULT 0")
+    private int viewCount;        // 조회수
+
+    // 기술스택 다대다 관계 (job_post_stacks 중간 테이블로 연결)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "job_post_stacks",
+            joinColumns = @JoinColumn(name = "job_post_id"),
+            inverseJoinColumns = @JoinColumn(name = "tech_stack_id")
+    )
+    private List<TechStack> techStacks = new ArrayList<>();
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -78,7 +85,7 @@ public class Job {
 
     @Builder
     public Job(String company, String title, String description, String location,
-               String experienceLevel, String employmentType, String techStack,
+               String experienceLevel, String employmentType,
                LocalDate deadline, String sourceUrl, String sourceSite) {
         this.company = company;
         this.title = title;
@@ -86,14 +93,19 @@ public class Job {
         this.location = location;
         this.experienceLevel = experienceLevel;
         this.employmentType = employmentType;
-        this.techStack = techStack;
         this.deadline = deadline;
         this.sourceUrl = sourceUrl;
         this.sourceSite = sourceSite;
         this.status = JobStatus.ACTIVE;
+        this.viewCount = 0;
     }
 
     // ===== 비즈니스 메서드 =====
+
+    /** 조회수 1 증가 — JPA 더티 체킹으로 트랜잭션 종료 시 자동 UPDATE */
+    public void incrementViewCount() {
+        this.viewCount++;
+    }
 
     /** 공고 마감 처리 */
     public void close() {
