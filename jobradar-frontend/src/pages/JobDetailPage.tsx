@@ -7,8 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-// import api from "../api/axios"; // TODO: 백엔드 연동 시 주석 해제
-import { mockJobDetail } from "../mocks/jobs"; // TODO: 백엔드 연동 시 삭제
+import { getJobById } from "../api/jobApi";
 
 // 상세 페이지용 공고 타입 (목록보다 필드가 더 많음)
 interface JobDetail {
@@ -37,16 +36,24 @@ const JobDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // TODO: 백엔드 연동 시 실제 API 호출로 교체
+  // 컴포넌트 마운트 시 공고 상세 조회
   useEffect(() => {
-    setTimeout(() => {
-      if (String(mockJobDetail.id) === id) {
-        setJob(mockJobDetail);
-      } else {
-        setError("존재하지 않는 채용공고입니다.");
+    const fetchJob = async () => {
+      try {
+        const res = await getJobById(Number(id));
+        setJob(res.data.data);
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          setError("존재하지 않는 채용공고입니다.");
+        } else {
+          setError("공고를 불러오는데 실패했습니다.");
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, 300);
+    };
+
+    fetchJob();
   }, [id]);
 
   // 로딩 중

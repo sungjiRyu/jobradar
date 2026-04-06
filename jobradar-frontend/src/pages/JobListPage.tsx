@@ -7,8 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// import api from "../api/axios"; // TODO: 백엔드 연동 시 주석 해제
-import { mockJobs } from "../mocks/jobs"; // TODO: 백엔드 연동 시 삭제
+import { getJobs } from "../api/jobApi";
 import SearchBar from "../components/job/SearchBar";
 import JobFilter from "../components/job/JobFilter";
 import JobCard from "../components/job/JobCard";
@@ -33,42 +32,45 @@ const JobListPage = () => {
   // 전체 페이지 수
   const [totalPages, setTotalPages] = useState(0);
 
-  // TODO: 백엔드 연동 시 아래 mock 로직을 실제 API 호출로 교체
-  // 공고 목록 조회 (현재 mock 데이터 사용)
+  // 공고 목록 API 호출
+  // keyword, filter, page가 변경될 때마다 자동 실행
   useEffect(() => {
-    setLoading(true);
-    setError("");
+    const fetchJobs = async () => {
+      setLoading(true);
+      setError("");
 
-    // mock 데이터에서 필터링
-    let filtered = [...mockJobs];
+      try {
+        // 쿼리 파라미터 구성 — 빈 값은 제외
+        const params: Record<string, string | number> = {
+          page,
+          size: 10,
+        };
 
-    // 키워드 검색 (회사명 또는 제목)
-    if (keyword) {
-      filtered = filtered.filter(
-        (job) =>
-          job.company.includes(keyword) || job.title.includes(keyword)
-      );
-    }
+        if (keyword) params.keyword = keyword;
 
-    // 필터 적용
-    if (filter) {
-      if (["서울", "경기", "부산"].includes(filter)) {
-        filtered = filtered.filter((job) => job.location.includes(filter));
-      } else if (["신입", "경력"].includes(filter)) {
-        filtered = filtered.filter((job) => job.experienceLevel === filter);
-      } else {
-        filtered = filtered.filter(
-          (job) => job.title.includes(filter) || job.company.includes(filter)
-        );
+        // 필터 값을 적절한 API 파라미터에 매핑
+        if (filter) {
+          if (["서울", "경기", "부산"].includes(filter)) {
+            params.location = filter;
+          } else if (["신입", "경력"].includes(filter)) {
+            params.experienceLevel = filter;
+          } else {
+            params.keyword = filter;
+          }
+        }
+
+        const res = await getJobs(params);
+        setJobs(res.data.data.content);
+        setTotalPages(res.data.data.totalPages);
+      } catch (err) {
+        console.error("공고 목록 조회 실패:", err);
+        setError("공고 목록을 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    // 로딩 효과를 위해 약간의 딜레이
-    setTimeout(() => {
-      setJobs(filtered);
-      setTotalPages(Math.ceil(filtered.length / 10));
-      setLoading(false);
-    }, 300);
+    fetchJobs();
   }, [keyword, filter, page]);
 
   // 검색 실행 시 페이지를 0으로 초기화

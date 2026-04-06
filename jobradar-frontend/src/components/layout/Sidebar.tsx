@@ -5,8 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-// import api from "../../api/axios"; // TODO: 백엔드 연동 시 주석 해제
-import { mockTechStacks } from "../../mocks/jobs"; // TODO: 백엔드 연동 시 삭제
+import { getTechStacks } from "../../api/jobApi";
 
 const Sidebar = () => {
   // 기술스택 목록 상태
@@ -14,12 +13,20 @@ const Sidebar = () => {
   // 로딩 상태
   const [loading, setLoading] = useState(true);
 
-  // TODO: 백엔드 연동 시 실제 API 호출로 교체
+  // 컴포넌트가 처음 렌더링될 때 기술스택 목록을 가져옴
   useEffect(() => {
-    setTimeout(() => {
-      setTechStacks(mockTechStacks);
-      setLoading(false);
-    }, 200);
+    const fetchTechStacks = async () => {
+      try {
+        const res = await getTechStacks();
+        setTechStacks(res.data.data);
+      } catch (err) {
+        console.error("기술스택 목록 조회 실패:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTechStacks();
   }, []);
 
   return (
