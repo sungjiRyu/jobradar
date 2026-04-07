@@ -1,18 +1,54 @@
 package com.jobradar.backend.scrap.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.jobradar.backend.global.common.ApiResponse;
+import com.jobradar.backend.scrap.dto.ScrapRequest;
+import com.jobradar.backend.scrap.dto.ScrapResponse;
+import com.jobradar.backend.scrap.service.ScrapService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 스크랩 컨트롤러
  *
- * [예정 API]
- * POST   /api/scraps/{jobId}  - 스크랩 추가
- * DELETE /api/scraps/{jobId}  - 스크랩 취소
- * GET    /api/scraps          - 내 스크랩 목록 조회
+ * 모든 API는 로그인 필수 (SecurityConfig에서 /api/scraps/** 는 authenticated)
+ * @AuthenticationPrincipal: JwtFilter가 SecurityContext에 저장한 email을 주입받음
  */
 @RestController
 @RequestMapping("/api/scraps")
+@RequiredArgsConstructor
 public class ScrapController {
-    // 스크랩 API 작업 시 구현 예정
+
+    private final ScrapService scrapService;
+
+    /**
+     * POST /api/scraps — 스크랩 추가
+     *
+     * @Valid: ScrapRequest의 @NotNull 유효성 검사를 실행
+     * @RequestBody: HTTP Body의 JSON을 ScrapRequest 객체로 변환
+     * @AuthenticationPrincipal: JWT에서 추출한 로그인 사용자 email
+     */
+    @PostMapping
+    public ApiResponse<ScrapResponse> addScrap(
+            @AuthenticationPrincipal String email,
+            @Valid @RequestBody ScrapRequest request) {
+
+        return ApiResponse.ok("스크랩이 추가되었습니다.", scrapService.addScrap(email, request.getJobPostId()));
+    }
+
+    /**
+     * DELETE /api/scraps/{id} — 스크랩 삭제
+     *
+     * @PathVariable: URL 경로의 {id} 값을 파라미터로 바인딩
+     * 본인의 스크랩만 삭제 가능 (타인 스크랩 시 403 Forbidden)
+     */
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteScrap(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long id) {
+
+        scrapService.deleteScrap(email, id);
+        return ApiResponse.ok("스크랩이 삭제되었습니다.");
+    }
 }
