@@ -103,6 +103,25 @@ public class ScrapService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 스크랩 상태 변경
+     *
+     * 더티 체킹(Dirty Checking) 활용:
+     * → 영속성 컨텍스트가 관리하는 엔티티의 필드를 변경하면
+     *   트랜잭션 종료 시 JPA가 자동으로 UPDATE 쿼리를 실행한다.
+     *   (별도로 save()를 호출하지 않아도 됨)
+     */
+    @Transactional
+    public ScrapResponse updateStatus(String email, Long scrapId, Scrap.ScrapStatus newStatus) {
+        Scrap scrap = findScrapOrThrow(scrapId);
+        validateOwner(scrap, email);
+
+        // 더티 체킹으로 상태 변경 → 트랜잭션 종료 시 자동 UPDATE
+        scrap.updateStatus(newStatus);
+
+        return ScrapResponse.from(scrap);
+    }
+
     // ===== Private 헬퍼 메서드 =====
 
     /** 스크랩 ID로 조회, 없으면 예외 발생 */
