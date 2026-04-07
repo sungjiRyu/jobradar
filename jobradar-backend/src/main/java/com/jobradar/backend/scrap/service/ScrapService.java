@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * 스크랩 서비스
  *
@@ -75,6 +78,29 @@ public class ScrapService {
         validateOwner(scrap, email);
 
         scrapRepository.delete(scrap);
+    }
+
+    /**
+     * 내 스크랩 목록 조회
+     *
+     * status 파라미터가 있으면 해당 상태만 필터링, 없으면 전체 조회
+     * JOIN FETCH로 N+1 문제 방지
+     */
+    public List<ScrapResponse> getMyScrapList(String email, Scrap.ScrapStatus status) {
+        List<Scrap> scraps;
+
+        if (status != null) {
+            // 상태별 필터 조회 (예: PENDING만 보기)
+            scraps = scrapRepository.findAllByUserEmailAndStatusWithJob(email, status);
+        } else {
+            // 전체 조회
+            scraps = scrapRepository.findAllByUserEmailWithJob(email);
+        }
+
+        // Entity 리스트 → DTO 리스트 변환
+        return scraps.stream()
+                .map(ScrapResponse::from)
+                .collect(Collectors.toList());
     }
 
     // ===== Private 헬퍼 메서드 =====

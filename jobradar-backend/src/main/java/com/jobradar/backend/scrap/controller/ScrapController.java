@@ -3,7 +3,10 @@ package com.jobradar.backend.scrap.controller;
 import com.jobradar.backend.global.common.ApiResponse;
 import com.jobradar.backend.scrap.dto.ScrapRequest;
 import com.jobradar.backend.scrap.dto.ScrapResponse;
+import com.jobradar.backend.scrap.entity.Scrap;
 import com.jobradar.backend.scrap.service.ScrapService;
+
+import java.util.List;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -50,5 +53,19 @@ public class ScrapController {
 
         scrapService.deleteScrap(email, id);
         return ApiResponse.ok("스크랩이 삭제되었습니다.");
+    }
+
+    /**
+     * GET /api/scraps — 내 스크랩 목록 조회
+     * GET /api/scraps?status=PENDING — 상태별 필터 조회
+     *
+     * @RequestParam(required = false): 선택 파라미터 — 없으면 전체 조회, 있으면 해당 상태만 필터링
+     */
+    @GetMapping
+    public ApiResponse<List<ScrapResponse>> getMyScrapList(
+            @AuthenticationPrincipal String email,
+            @RequestParam(required = false) Scrap.ScrapStatus status) {
+
+        return ApiResponse.ok(scrapService.getMyScrapList(email, status));
     }
 }
