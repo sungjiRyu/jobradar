@@ -40,6 +40,14 @@ public class Scrap {
     @JoinColumn(name = "job_id", nullable = false)
     private Job job;
 
+    /**
+     * @Enumerated(EnumType.STRING): Enum 값을 문자열로 DB에 저장
+     * → ORDINAL(숫자)로 저장하면 Enum 순서 변경 시 데이터 꼬임
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ScrapStatus status;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
@@ -52,5 +60,21 @@ public class Scrap {
     public Scrap(User user, Job job) {
         this.user = user;
         this.job = job;
+        this.status = ScrapStatus.PENDING; // 스크랩 생성 시 기본값: 지원예정
+    }
+
+    // ===== 비즈니스 메서드 =====
+
+    /** 스크랩 상태 변경 — JPA 더티 체킹으로 트랜잭션 종료 시 자동 UPDATE */
+    public void updateStatus(ScrapStatus status) {
+        this.status = status;
+    }
+
+    // ===== 스크랩 상태 Enum =====
+    public enum ScrapStatus {
+        PENDING,    // 지원예정 (스크랩 직후 기본값)
+        APPLIED,    // 지원완료 (지원서 제출 완료)
+        REVIEWING,  // 서류검토 (서류 검토 중)
+        REJECTED    // 탈락 (서류 또는 면접 탈락)
     }
 }
