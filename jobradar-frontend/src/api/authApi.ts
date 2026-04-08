@@ -14,3 +14,8 @@ export const login = (email: string, password: string) => {
 export const logout = () => {
   return api.post("/api/auth/logout");
 };
+
+// 비밀번호 확인: POST /api/auth/verify-password
+export const verifyPassword = (password: string) => {
+  return api.post("/api/auth/verify-password", { password });
+};
