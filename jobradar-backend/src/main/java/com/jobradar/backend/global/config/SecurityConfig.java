@@ -53,6 +53,7 @@ public class SecurityConfig {
                             "/api/users/signup",     // 회원가입
                             "/api/jobs/**",          // 채용공고 조회 (비로그인도 가능)
                             "/api/tech-stacks/**",   // 기술스택 목록 조회 (비로그인도 가능)
+                            "/api/stats/**",         // 대시보드 통계 (비로그인도 가능)
                             "/swagger-ui/**",        // Swagger UI
                             "/v3/api-docs/**"        // Swagger API 문서
                     ).permitAll()
