@@ -44,6 +44,9 @@ dependencies {
 
 	// Swagger UI (API 문서 자동 생성)
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
+
+	// Redis 캐싱 (@Cacheable 어노테이션 사용을 위해 필요)
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-redis-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
