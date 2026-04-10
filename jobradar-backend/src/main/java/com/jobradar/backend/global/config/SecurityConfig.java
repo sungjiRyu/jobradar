@@ -57,6 +57,9 @@ public class SecurityConfig {
                             "/swagger-ui/**",        // Swagger UI
                             "/v3/api-docs/**"        // Swagger API 문서
                     ).permitAll()
+                    // /api/admin/**는 로그인한 사용자만 접근 가능 (수동 크롤링 등 관리 기능)
+                    // 운영 환경에서는 .hasRole("ADMIN")으로 더 엄격히 제한 권장
+                    .requestMatchers("/api/admin/**").authenticated()
                     .anyRequest().authenticated()  // 그 외 모든 요청은 로그인 필요
             )
 
