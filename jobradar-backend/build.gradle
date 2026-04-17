@@ -39,7 +39,7 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
-	// 크롤링 (채용공고 수집)
+	// 크롤링 (채용공고 수집) - Jsoup: HTML 파싱 라이브러리
 	implementation 'org.jsoup:jsoup:1.17.2'
 
 	// Swagger UI (API 문서 자동 생성)

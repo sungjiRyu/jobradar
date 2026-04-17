@@ -14,12 +14,6 @@ import java.util.List;
  * - 매일 오전 9시에 자동 실행
  * - List<CrawlerService>로 모든 크롤러 구현체를 주입받아 순차 실행
  * - 새 크롤러 추가 시 CrawlerService 구현체만 만들면 자동으로 여기에도 포함됨
- *
- * [왜 List<CrawlerService>로 주입받는가?]
- * - Spring은 같은 인터페이스를 구현한 빈이 여러 개면 자동으로 List에 담아줌
- * - 현재: [SaraminCrawlerService]
- * - 향후: [SaraminCrawlerService, JobkoreaCrawlerService, WantedCrawlerService]
- * - 스케줄러 코드 변경 없이 크롤러만 추가하면 됨 (OCP 원칙)
  */
 @Slf4j
 @Component
