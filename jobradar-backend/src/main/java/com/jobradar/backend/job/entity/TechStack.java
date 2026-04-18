@@ -9,10 +9,6 @@ import lombok.NoArgsConstructor;
 /**
  * 기술스택 엔티티
  *
- * 기술스택 목록을 별도 테이블로 관리하는 이유:
- * - 공고 검색 시 기술스택 필터로 활용
- * - 프론트엔드 필터 드롭다운에 목록 제공
- * - 동일 기술명의 일관성 보장 (오타 방지)
  */
 @Entity
 @Table(name = "tech_stacks")

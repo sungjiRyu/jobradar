@@ -3,17 +3,8 @@ package com.jobradar.backend.crawler;
 /**
  * 크롤러 서비스 인터페이스
  *
- * [왜 인터페이스로 만들었는가?]
- * 1. 확장 가능한 구조 (OCP - Open/Closed Principle)
- *    - 현재: SaraminCrawlerService
- *    - 향후: JobkoreaCrawlerService, WantedCrawlerService 등 추가 가능
- *    - 새 사이트 추가 시 이 인터페이스를 구현하는 클래스만 만들면 됨
- *    - 기존 코드 수정 없이 기능 확장 가능
- *
- * 2. 의존성 역전 원칙 (DIP)
- *    - CrawlerScheduler는 구체 클래스가 아닌 이 인터페이스에 의존
- *    - List<CrawlerService>로 모든 구현체를 자동 주입받아 순회 실행
- *    - 면접 포인트: "다형성을 활용해 확장에 열려있고 변경에 닫힌 구조로 설계했습니다"
+ * 새 사이트 추가 시 이 인터페이스를 구현하는 클래스만 만들면 됨.
+ * CrawlerScheduler는 List<CrawlerService>로 모든 구현체를 자동 주입받아 순회 실행.
  */
 public interface CrawlerService {
 

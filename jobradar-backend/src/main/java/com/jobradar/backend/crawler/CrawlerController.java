@@ -16,10 +16,6 @@ import java.util.List;
  * - 현재: SecurityConfig에서 /api/admin/** 는 로그인한 사용자만 접근 가능
  * - 운영 환경: ADMIN 롤을 가진 계정만 호출 가능하도록 hasRole("ADMIN") 추가 권장
  *
- * [왜 만들었는가?]
- * - 스케줄러는 매일 9시에만 실행됨 → 개발 중 즉시 테스트 불가
- * - 이 API로 언제든 수동 실행 가능
- * - Postman 또는 Swagger에서 POST /api/admin/crawl 호출
  */
 @Slf4j
 @RestController
