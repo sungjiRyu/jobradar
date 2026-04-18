@@ -117,14 +117,7 @@ const LoginPage = () => {
           {/* API 실패 에러 메시지 */}
           {error && <p className="text-[11px] text-[#E24B4A]">{error}</p>}
 
-          {/* 6. 비밀번호 찾기 링크 — 오른쪽 정렬 */}
-          <div className="flex justify-end">
-            <a href="#" className="text-[12px] text-[#378ADD]">
-              비밀번호 찾기
-            </a>
-          </div>
-
-          {/* 7. 로그인 버튼 — isFormValid가 false면 disabled, opacity 50% */}
+          {/* 6. 로그인 버튼 — isFormValid가 false면 disabled, opacity 50% */}
           <button
             type="submit"
             disabled={!isFormValid}

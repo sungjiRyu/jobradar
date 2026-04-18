@@ -73,15 +73,20 @@ const JobListPage = () => {
     fetchJobs();
   }, [keyword, filter, page]);
 
+  // 검색창에 표시되는 입력값 (keyword와 분리 — 엔터/버튼 클릭 전까지는 API 호출 안 함)
+  const [searchInput, setSearchInput] = useState("");
+
   // 검색 실행 시 페이지를 0으로 초기화
   const handleSearch = (newKeyword: string) => {
     setKeyword(newKeyword);
     setPage(0);
   };
 
-  // 필터 변경 시 페이지를 0으로 초기화
+  // 필터 변경 시 페이지를 0으로 초기화하고 검색어도 초기화
   const handleFilter = (newFilter: string) => {
     setFilter(newFilter);
+    setKeyword("");
+    setSearchInput("");
     setPage(0);
   };
 
@@ -89,7 +94,11 @@ const JobListPage = () => {
     <div className="max-w-[1100px] mx-auto px-6 py-6">
       {/* 검색바 */}
       <div className="mb-4">
-        <SearchBar onSearch={handleSearch} />
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+        />
       </div>
 
       {/* 필터 칩 */}
@@ -139,20 +148,48 @@ const JobListPage = () => {
 
               {/* 페이지네이션 */}
               {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-8">
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setPage(i)}
-                      className={`w-8 h-8 rounded text-[13px] ${
-                        page === i
-                          ? "bg-[#378ADD] text-white"
-                          : "bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD]"
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
+                <div className="flex justify-center gap-1 mt-8">
+                  {/* 이전 버튼 */}
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="w-8 h-8 rounded text-[13px] bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    ‹
+                  </button>
+
+                  {/* 페이지 번호 버튼 — 현재 페이지 기준 최대 10개 표시 */}
+                  {(() => {
+                    const maxVisible = 10;
+                    const half = Math.floor(maxVisible / 2);
+                    let start = Math.max(0, page - half);
+                    const end = Math.min(totalPages, start + maxVisible);
+                    if (end - start < maxVisible) {
+                      start = Math.max(0, end - maxVisible);
+                    }
+                    return Array.from({ length: end - start }, (_, i) => start + i).map((i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPage(i)}
+                        className={`w-8 h-8 rounded text-[13px] ${
+                          page === i
+                            ? "bg-[#378ADD] text-white"
+                            : "bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD]"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ));
+                  })()}
+
+                  {/* 다음 버튼 */}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page === totalPages - 1}
+                    className="w-8 h-8 rounded text-[13px] bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    ›
+                  </button>
                 </div>
               )}
             </>
