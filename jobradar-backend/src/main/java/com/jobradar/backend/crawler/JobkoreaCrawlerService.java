@@ -51,9 +51,12 @@ public class JobkoreaCrawlerService implements CrawlerService {
     private final TechStackRepository techStackRepository;
 
     static final String BASE_URL = "https://www.jobkorea.co.kr";
-    // 백엔드(1000229), 프론트엔드(1000230), 웹개발(1000231) 직무 필터
-    static final String LIST_URL = BASE_URL + "/recruit/joblist?menucode=duty"
-            + "&duty=1000229%2C1000230%2C1000231&Page_No=";
+
+    // 잡코리아 공고 목록 AJAX 엔드포인트
+    // - GET /recruit/joblist 는 SSR로 1페이지만 반환하며 Page 파라미터를 무시함
+    // - 브라우저에서 페이지 이동 시 JavaScript가 이 POST URL을 호출하여 HTML 조각을 받아옴
+    // - Jsoup은 JavaScript를 실행할 수 없으므로 이 POST 엔드포인트를 직접 호출해야 페이지 이동 가능
+    static final String POST_URL = BASE_URL + "/Recruit/Home/_GI_List/";
 
     // 최대 페이지 수 (안전장치): 빈 페이지 감지 시 자동 중단되므로 실제로는 마지막 페이지에서 멈춤
     static final int MAX_PAGES = 200;
@@ -72,11 +75,14 @@ public class JobkoreaCrawlerService implements CrawlerService {
     /**
      * 잡코리아 공고 수집 (빈 페이지가 나올 때까지 자동 반복)
      *
-     * 잡코리아는 SSR(서버사이드 렌더링)이라 Jsoup으로 직접 HTML 파싱 가능.
-     * 필터 선택 시 브라우저 URL은 안 바뀌지만, 서버는 파라미터를 받아 처리함.
+     * [페이지 이동 방식]
+     * - GET /recruit/joblist 는 SSR로 1페이지만 반환, Page 파라미터를 무시함
+     * - 페이지 이동은 POST /Recruit/Home/_GI_List/ + Page=N 으로만 가능
      *
      * [종료 조건]
      * - crawlPage()가 -1 반환 → 해당 페이지에 공고가 없음 = 마지막 페이지 도달
+     * - crawlPage()가 0 반환 → 해당 페이지의 공고가 모두 DB에 이미 존재 = 중복 페이지
+     *   (이미 수집된 데이터만 있으므로 이후 페이지도 마찬가지일 가능성이 높아 중단)
      * - MAX_PAGES 초과 → 무한 루프 방지용 안전장치
      * - IOException → 네트워크 오류
      */
@@ -92,6 +98,12 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 // -1: 빈 페이지 = 마지막 페이지 도달 → 수집 종료
                 if (saved == -1) {
                     log.info("[{}] {}페이지에서 공고 없음 → 수집 완료", getSiteName(), page);
+                    break;
+                }
+
+                // 0: 해당 페이지 공고가 모두 DB에 이미 존재 → 더 이상 수집할 신규 공고 없음
+                if (saved == 0) {
+                    log.info("[{}] {}페이지 모두 중복 → 수집 종료", getSiteName(), page);
                     break;
                 }
 
@@ -115,24 +127,33 @@ public class JobkoreaCrawlerService implements CrawlerService {
     /**
      * 특정 페이지에서 공고 목록 파싱 후 저장
      *
+     * GET 방식은 항상 1페이지만 반환하므로, AJAX 엔드포인트(POST)를 직접 호출함.
+     * - POST_URL: /Recruit/Home/_GI_List/
+     * - Body: menucode=duty&duty=...&Page=N
+     * - X-Requested-With: XMLHttpRequest → AJAX 요청임을 서버에 알림 (없으면 차단될 수 있음)
+     *
      * @return 저장된 공고 수 (공고가 없는 마지막 페이지면 -1)
      */
     private int crawlPage(int page) throws IOException {
-        String url = LIST_URL + page;
-
-        // - maxBodySize(0): 응답 크기 제한 해제 (기본값 2MB로 잘릴 수 있음)
-        // - userAgent: 브라우저처럼 보이게 설정 (미설정 시 차단될 수 있음)
-        Document doc = Jsoup.connect(url)
+        // Jsoup.connect().post() 대신 data() + post() 조합 사용
+        // - .data(key, value): application/x-www-form-urlencoded 형식으로 body 전송
+        // - Jsoup은 POST body를 key=value 쌍으로만 설정 가능하므로 requestBody() 대신 data() 사용
+        Document doc = Jsoup.connect(POST_URL)
                 .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                         + "AppleWebKit/537.36 (KHTML, like Gecko) "
                         + "Chrome/124.0.0.0 Safari/537.36")
                 .header("Accept-Language", "ko-KR,ko;q=0.9")
+                // AJAX 요청임을 서버에 알리는 헤더 (없으면 일반 페이지 HTML을 반환할 수 있음)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .data("menucode", "duty")
+                .data("duty", "1000229,1000230,1000231")
+                .data("Page", String.valueOf(page))
                 .maxBodySize(0)
                 .timeout(10_000)
-                .get();
+                .post();
 
-        // tr.devloopArea: 잡코리아 공고 목록의 각 공고 항목 (table row)
-        Elements items = doc.select("tr.devloopArea");
+        // div.tplList.tplJobList 안의 tr.devloopArea: 일반공고만 선택 (강조공고 li.devloopArea 제외)
+        Elements items = doc.select("div.tplList.tplJobList tr.devloopArea");
 
         if (items.isEmpty()) {
             log.info("[{}] {}페이지 공고 없음 → 마지막 페이지 도달", getSiteName(), page);
