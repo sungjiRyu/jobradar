@@ -85,11 +85,6 @@ const JobListPage = () => {
     setPage(0);
   };
 
-  // 스크랩 버튼 클릭 (추후 API 연동)
-  const handleScrap = (jobId: number) => {
-    console.log("스크랩:", jobId);
-  };
-
   return (
     <div className="max-w-[1100px] mx-auto px-6 py-6">
       {/* 검색바 */}
@@ -137,7 +132,7 @@ const JobListPage = () => {
                     onClick={() => navigate(`/jobs/${job.id}`)}
                     className="cursor-pointer"
                   >
-                    <JobCard job={job} onScrap={handleScrap} />
+                    <JobCard job={job} />
                   </div>
                 ))}
               </div>
