@@ -30,19 +30,15 @@ public class CrawlerScheduler {
      * @Scheduled(cron = "0 0 9 * * *")
      *
      * cron 표현식 구조: [초] [분] [시] [일] [월] [요일]
-     *   0   0   9  *   *    *
+     *   0   0   3  *   *    *
      *   ↑   ↑   ↑  ↑   ↑    ↑
-     *  0초 0분 9시 매일 매월 모든요일
+     *  0초 0분 3시 매일 매월 모든요일
      *
-     * → 매일 오전 9시 정각에 실행
-     *
-     * [왜 오전 9시?]
-     * - 채용 담당자들이 출근 후 공고를 올리는 시간대
-     * - 새벽 시간보다 최신 공고가 많을 확률이 높음
+     * → 매일 새벽 3시 정각에 실행
      *
      * [주의] @EnableScheduling이 main 클래스에 있어야 동작함
      */
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 0 3 * * *")
     public void runCrawling() {
         log.info("===== 채용공고 수집 스케줄러 시작 =====");
 
