@@ -10,10 +10,6 @@ import java.time.LocalDateTime;
 /**
  * 스크랩 목록 응답 DTO
  *
- * Entity를 직접 반환하지 않고 DTO로 변환하는 이유:
- * 1. 불필요한 필드 노출 방지 (보안)
- * 2. 순환 참조 방지 (User ↔ Scrap ↔ Job)
- * 3. API 스펙 변경 시 Entity 영향 없음
  */
 @Getter
 @Builder

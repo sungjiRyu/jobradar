@@ -16,10 +16,6 @@ import java.util.List;
 /**
  * 대시보드 통계 조회 Repository
  *
- * [왜 별도 Repository인가?]
- * - 통계 쿼리는 JobRepository의 CRUD 목적과 다름
- * - 도메인 책임 분리: 집계/통계는 StatsRepository, CRUD는 JobRepository
- * - 같은 job_posts 테이블을 조회하지만 JPA는 동일 엔티티에 여러 Repository를 허용
  */
 public interface StatsRepository extends JpaRepository<Job, Long> {
 
@@ -62,9 +58,6 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
     /**
      * 오늘 신규 등록 공고 수
      *
-     * [JPQL 설명]
-     * - DATE() 함수 대신 범위 비교(>= startOfDay AND < endOfDay)를 쓰는 이유:
-     *   함수로 감싸면 인덱스를 못 타지만, 범위 비교는 createdAt 인덱스를 활용 가능
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +

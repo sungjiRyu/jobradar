@@ -10,6 +10,14 @@ import org.springframework.data.repository.query.Param;
 /** 채용공고 레포지토리 */
 public interface JobRepository extends JpaRepository<Job, Long> {
 
+    /**
+     * 중복 공고 체크 - sourceUrl 기준
+     * Spring Data JPA가 메서드명을 분석해 자동으로 SQL 생성:
+     * SELECT COUNT(*) > 0 FROM job_posts WHERE source_url = ?
+     * 크롤러에서 이미 수집한 공고를 다시 저장하지 않기 위해 사용
+     */
+    boolean existsBySourceUrl(String sourceUrl);
+
     /** 복합 조건 검색 쿼리 (키워드/지역/경력/기술스택) */
     @Query(value = "SELECT DISTINCT j FROM Job j " +
                    "LEFT JOIN j.techStacks ts " +
