@@ -149,6 +149,15 @@ const JobListPage = () => {
               {/* 페이지네이션 */}
               {totalPages > 1 && (
                 <div className="flex justify-center gap-1 mt-8">
+                  {/* 첫 페이지 버튼 */}
+                  <button
+                    onClick={() => setPage(0)}
+                    disabled={page === 0}
+                    className="w-8 h-8 rounded text-[13px] bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    «
+                  </button>
+
                   {/* 이전 버튼 */}
                   <button
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -189,6 +198,15 @@ const JobListPage = () => {
                     className="w-8 h-8 rounded text-[13px] bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD] disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     ›
+                  </button>
+
+                  {/* 마지막 페이지 버튼 */}
+                  <button
+                    onClick={() => setPage(totalPages - 1)}
+                    disabled={page === totalPages - 1}
+                    className="w-8 h-8 rounded text-[13px] bg-white text-[#888780] border border-[#DDDDDD] hover:border-[#378ADD] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    »
                   </button>
                 </div>
               )}
