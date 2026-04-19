@@ -13,6 +13,7 @@ import DashboardPage from "../pages/DashboardPage";
 import MyPage from "../pages/MyPage";
 import VerifyPasswordPage from "../pages/VerifyPasswordPage";
 import EditProfilePage from "../pages/EditProfilePage";
+import NotFoundPage from "../pages/NotFoundPage";
 
 const AppRouter = () => {
   return (
@@ -23,6 +24,7 @@ const AppRouter = () => {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/jobs/:id" element={<JobDetailPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="*" element={<NotFoundPage />} />
 
       {/* 보호된 라우트 — accessToken 없으면 /login으로 리다이렉트 */}
       <Route

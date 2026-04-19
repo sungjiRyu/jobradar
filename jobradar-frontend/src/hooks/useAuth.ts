@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../store/authStore";
 import {
   login as loginApi,
@@ -9,6 +9,7 @@ import {
 const useAuth = () => {
   const { login, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // 로그인
   const handleLogin = async (email: string, password: string) => {
@@ -16,7 +17,9 @@ const useAuth = () => {
     const { accessToken, refreshToken } = res.data.data;
     localStorage.setItem("refreshToken", refreshToken);
     login(res.data.data, accessToken);
-    navigate("/");
+    // PrivateRoute에서 넘겨준 from 경로가 있으면 그 페이지로, 없으면 홈으로 이동
+    const from = (location.state as { from?: string })?.from ?? "/";
+    navigate(from, { replace: true });
   };
 
   // 회원가입

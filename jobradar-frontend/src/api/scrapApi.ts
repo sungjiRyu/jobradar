@@ -8,6 +8,11 @@ import api from "./axios";
 // 스크랩 상태 타입
 export type ScrapStatus = "PENDING" | "APPLIED" | "REVIEWING" | "REJECTED";
 
+// 스크랩 추가: POST /api/scraps
+export const addScrap = (jobPostId: number) => {
+  return api.post("/api/scraps", { jobPostId });
+};
+
 // 스크랩 목록 조회: GET /api/scraps
 export const getScraps = () => {
   return api.get("/api/scraps");

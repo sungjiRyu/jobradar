@@ -1,10 +1,7 @@
-/**
- * JobCard — 채용공고 카드 컴포넌트
- * 공고 목록 페이지에서 각 공고를 카드 형태로 표시
- * 회사명, 직무명, 기술스택 태그, 마감일(D-day), 스크랩 버튼 포함
- */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { addScrap } from "../../api/scrapApi";
 
-// 공고 데이터 타입 (API 응답 기준)
 export interface Job {
   id: number;
   company: string;
@@ -13,14 +10,13 @@ export interface Job {
   experienceLevel: string;
   employmentType: string;
   techStacks: string[];
-  deadline: string;
+  deadline: string | null;
   sourceSite: string;
   viewCount: number;
 }
 
-// D-day 계산 함수
-// deadline(마감일)과 오늘 날짜의 차이를 일(day) 단위로 반환
-const calcDday = (deadline: string): number => {
+const calcDday = (deadline: string | null): number | null => {
+  if (!deadline) return null;
   const today = new Date();
   const deadlineDate = new Date(deadline);
   const diff = deadlineDate.getTime() - today.getTime();
@@ -29,11 +25,38 @@ const calcDday = (deadline: string): number => {
 
 interface JobCardProps {
   job: Job;
-  onScrap: (jobId: number) => void;
 }
 
-const JobCard = ({ job, onScrap }: JobCardProps) => {
+const JobCard = ({ job }: JobCardProps) => {
+  const navigate = useNavigate();
   const dday = calcDday(job.deadline);
+
+  // 스크랩 완료 여부 — 클릭 후 하트 색상 변경에 사용
+  const [scrapped, setScrapped] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleScrap = async (e: React.MouseEvent) => {
+    // 카드 전체 클릭 이벤트로 전파되지 않도록 차단
+    e.stopPropagation();
+
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    if (scrapped || loading) return;
+
+    try {
+      setLoading(true);
+      await addScrap(job.id);
+      setScrapped(true);
+    } catch {
+      alert("스크랩에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg border border-[#DDDDDD] p-5 hover:shadow-md transition-shadow">
@@ -41,10 +64,14 @@ const JobCard = ({ job, onScrap }: JobCardProps) => {
       <div className="flex justify-between items-start mb-2">
         <span className="text-[13px] text-[#888780]">{job.company}</span>
         <button
-          onClick={() => onScrap(job.id)}
-          className="text-[#DDDDDD] hover:text-red-400 transition-colors"
+          onClick={handleScrap}
+          disabled={loading}
+          className={`transition-colors text-lg leading-none ${
+            scrapped ? "text-red-400" : "text-[#DDDDDD] hover:text-red-400"
+          }`}
+          title={scrapped ? "스크랩됨" : "스크랩"}
         >
-          ♥
+          {scrapped ? "♥" : "♡"}
         </button>
       </div>
 
@@ -72,8 +99,14 @@ const JobCard = ({ job, onScrap }: JobCardProps) => {
           <span>·</span>
           <span>{job.experienceLevel}</span>
         </div>
-        <span className={dday <= 3 ? "text-[#E24B4A] font-semibold" : ""}>
-          {dday > 0 ? `D-${dday}` : dday === 0 ? "D-Day" : "마감"}
+        <span className={dday !== null && dday <= 3 ? "text-[#E24B4A] font-semibold" : ""}>
+          {dday === null
+            ? "상시채용"
+            : dday < 0
+            ? "마감"
+            : dday === 0
+            ? "D-Day"
+            : `D-${dday}`}
         </span>
       </div>
     </div>

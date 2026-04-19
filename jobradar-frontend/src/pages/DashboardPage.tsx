@@ -268,14 +268,34 @@ const DashboardPage = () => {
   };
 
   // ─── 경력별 도넛 차트 ─────────────────────────
-  // 신입부터 고경력까지 비중을 한눈에 파악하기 좋은 도넛 차트 사용
-  const expColors = ["#378ADD", "#1D9E75", "#F5A623", "#D85A30"];
+  // 백엔드 경력 값이 너무 세분화되어 있어 3개 그룹으로 합산
+  const groupExperience = (exp: string): string => {
+    if (exp.includes("신입")) return "신입";
+    const match = exp.match(/경력(\d+)/);
+    if (match) {
+      return parseInt(match[1]) <= 4 ? "경력 1~3년" : "경력 5년 이상";
+    }
+    return "경력 1~3년"; // "경력무관", "경력" 등 → 경력 1~3년으로 분류
+  };
+
+  const GROUP_LABELS = ["신입", "경력 1~3년", "경력 5년 이상"];
+  const grouped = experiences.reduce<Record<string, number>>((acc, item) => {
+    const group = groupExperience(item.experience);
+    acc[group] = (acc[group] ?? 0) + item.count;
+    return acc;
+  }, {});
+  const compressedExp = GROUP_LABELS.map((label) => ({
+    experience: label,
+    count: grouped[label] ?? 0,
+  }));
+
+  const expColors = ["#378ADD", "#1D9E75", "#F5A623"];
 
   const expChartData = {
-    labels: experiences.map((e) => e.experience),
+    labels: compressedExp.map((e) => e.experience),
     datasets: [
       {
-        data: experiences.map((e) => e.count),
+        data: compressedExp.map((e) => e.count),
         backgroundColor: expColors,
         // 도넛 중앙 구멍의 공백 비율 (0~1)
         hoverOffset: 8,
@@ -434,35 +454,28 @@ const DashboardPage = () => {
         <section aria-label="경력별 공고 비중" className="mb-4">
           <article className="bg-white border border-[#DDDDDD] rounded-xl p-5">
             <h2 className="text-base font-semibold text-gray-700 mb-4">경력별 공고 비중</h2>
-            {experiences.length === 0 ? (
+            {compressedExp.every((e) => e.count === 0) ? (
               <p className="text-sm text-gray-400 text-center py-10">데이터 없음</p>
             ) : (
               <div className="flex flex-col md:flex-row items-center gap-6">
-                {/* 도넛 차트 — 가운데 구멍이 있어 비중 차이를 직관적으로 표현 */}
                 <div className="h-[260px] w-full md:w-[320px]">
                   <Doughnut data={expChartData} options={expChartOptions} />
                 </div>
-                {/* 경력별 상세 수치 목록 */}
                 <ul className="flex-1 space-y-3 w-full">
-                  {experiences.map((e, i) => {
-                    const total = experiences.reduce((sum, x) => sum + x.count, 0);
+                  {compressedExp.map((e, i) => {
+                    const total = compressedExp.reduce((sum, x) => sum + x.count, 0);
                     const pct = total > 0 ? ((e.count / total) * 100).toFixed(1) : "0.0";
                     return (
                       <li key={e.experience} className="flex items-center gap-3">
-                        {/* 색상 점 */}
                         <span
                           className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: expColors[i % expColors.length] }}
+                          style={{ backgroundColor: expColors[i] }}
                         />
                         <span className="flex-1 text-sm text-gray-600">{e.experience}</span>
-                        {/* 비중 바 */}
                         <div className="w-32 bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
                             className="h-2 rounded-full"
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: expColors[i % expColors.length],
-                            }}
+                            style={{ width: `${pct}%`, backgroundColor: expColors[i] }}
                           />
                         </div>
                         <span className="text-sm font-medium text-gray-700 w-20 text-right">

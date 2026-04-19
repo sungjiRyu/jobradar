@@ -1,31 +1,34 @@
 import { create } from "zustand";
 
-// 유저 정보 타입 (auth-api.md 응답 기준)
 interface User {
   email: string;
   nickname: string;
 }
 
-// 스토어 전체 타입
 interface AuthStore {
   user: User | null;
   login: (user: User, accessToken: string) => void;
   logout: () => void;
 }
 
-const useAuthStore = create<AuthStore>((set) => ({
-  // 로그인한 유저 정보(null이면 비로그인 상태)
-  user: null,
+// 새로고침 후에도 로그인 상태를 유지하기 위해 localStorage에서 user 정보를 복원
+const savedUser = localStorage.getItem("user");
+const initialUser: User | null = savedUser ? JSON.parse(savedUser) : null;
 
-  // 로그인 - 유저 정보 저장 + 토큰 localStorage에 저장
+const useAuthStore = create<AuthStore>((set) => ({
+  user: initialUser,
+
   login: (user: User, accessToken: string) => {
     localStorage.setItem("accessToken", accessToken);
+    // user 정보도 localStorage에 저장해야 새로고침 후 복원 가능
+    localStorage.setItem("user", JSON.stringify(user));
     set({ user });
   },
 
-  // 로그아웃 - 유저 정보 초기화 + 토큰 삭제
   logout: () => {
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
     set({ user: null });
   },
 }));

@@ -1,6 +1,7 @@
 package com.jobradar.backend.stats.dto;
 
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.io.Serializable;
@@ -9,15 +10,16 @@ import java.io.Serializable;
  * 경력별 공고 비중 응답 DTO
  * 예시: { "experience": "신입", "count": 312, "percentage": 24 }
  *
- * Serializable: Redis 캐시(JDK 직렬화) 저장을 위해 필요
+ * @NoArgsConstructor: JSON 역직렬화 시 Jackson이 기본 생성자로 객체를 먼저 생성하므로 필요
  */
 @Getter
+@NoArgsConstructor
 public class ExperienceStatResponse implements Serializable {
 
-    private final String experience; // 경력 구분명 (신입, 경력 1~3년 등)
-    private final long count;        // 해당 경력 공고 수
+    private String experience;
+    private long count;
     @Setter
-    private double percentage;       // 전체 대비 비중 (%) - 서비스에서 계산 후 주입
+    private double percentage;
 
     // JPQL new 생성자 표현식: new ExperienceStatResponse(j.experienceLevel, COUNT(j))
     public ExperienceStatResponse(String experience, long count) {

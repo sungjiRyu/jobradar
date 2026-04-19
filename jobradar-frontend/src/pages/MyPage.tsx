@@ -15,13 +15,15 @@ interface UserInfo {
   nickname: string;
 }
 
-// 스크랩 아이템 타입 — API GET /api/scraps 응답 구조
+// 스크랩 아이템 타입 — API GET /api/scraps 응답 구조 (ScrapResponse.java 기준)
 interface ScrapItem {
-  id: number;
-  jobTitle: string;
-  companyName: string;
-  deadline: string; // "2025-05-01" 같은 날짜 문자열
-  status: ScrapStatus; // "PENDING" | "APPLIED" | "REVIEWING" | "REJECTED"
+  scrapId: number;
+  jobPostId: number;
+  title: string;
+  company: string;
+  deadline: string;
+  status: ScrapStatus;
+  createdAt: string;
 }
 
 // D-day 계산 함수: 마감일까지 남은 일수 반환
@@ -105,7 +107,7 @@ const MyPage = () => {
       // API 성공 후 전체 재요청 없이 해당 항목만 로컬에서 업데이트
       // prev.map: id 일치하는 것만 status 교체, 나머지는 그대로
       setScraps((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status } : s))
+        prev.map((s) => (s.scrapId === id ? { ...s, status } : s))
       );
     } catch {
       alert("상태 변경에 실패했습니다.");
@@ -118,7 +120,7 @@ const MyPage = () => {
     try {
       await deleteScrap(id);
       // filter: id 일치하지 않는 것만 남김 → 해당 항목 제거 효과
-      setScraps((prev) => prev.filter((s) => s.id !== id));
+      setScraps((prev) => prev.filter((s) => s.scrapId !== id));
     } catch {
       alert("삭제에 실패했습니다.");
     }
@@ -254,13 +256,13 @@ const MyPage = () => {
                       const isUrgent = dday >= 0 && dday <= 3;
                       return (
                         <li
-                          key={scrap.id}
+                          key={scrap.scrapId}
                           className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between"
                         >
                           {/* 공고 정보 */}
                           <div className="flex flex-col gap-1">
-                            <p className="text-[14px] font-medium">{scrap.jobTitle}</p>
-                            <p className="text-[12px] text-[#888780]">{scrap.companyName}</p>
+                            <p className="text-[14px] font-medium">{scrap.title}</p>
+                            <p className="text-[12px] text-[#888780]">{scrap.company}</p>
                             {/* D-day: 3일 이내면 빨간색 */}
                             <p className={`text-[12px] font-medium ${isUrgent ? "text-[#A32D2D]" : "text-[#888780]"}`}>
                               {dday < 0 ? "마감" : dday === 0 ? "D-day" : `D-${dday}`}
@@ -278,7 +280,7 @@ const MyPage = () => {
                             <select
                               value={scrap.status}
                               onChange={(e) =>
-                                handleStatusChange(scrap.id, e.target.value as ScrapStatus)
+                                handleStatusChange(scrap.scrapId, e.target.value as ScrapStatus)
                               }
                               className="text-[12px] border border-[#DDDDDD] rounded-lg px-2 py-1 outline-none focus:border-[#378ADD] bg-white"
                             >
@@ -290,7 +292,7 @@ const MyPage = () => {
 
                             {/* 삭제 버튼 */}
                             <button
-                              onClick={() => handleDelete(scrap.id)}
+                              onClick={() => handleDelete(scrap.scrapId)}
                               className="text-[12px] text-[#A32D2D] border border-[#A32D2D] rounded-lg px-2 py-1 hover:bg-[#FCEBEB] transition-colors"
                             >
                               삭제
@@ -349,12 +351,12 @@ const MyPage = () => {
                   <ul className="flex flex-col gap-3">
                     {filteredApply.map((scrap) => (
                       <li
-                        key={scrap.id}
+                        key={scrap.scrapId}
                         className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between"
                       >
                         <div className="flex flex-col gap-1">
-                          <p className="text-[14px] font-medium">{scrap.jobTitle}</p>
-                          <p className="text-[12px] text-[#888780]">{scrap.companyName}</p>
+                          <p className="text-[14px] font-medium">{scrap.title}</p>
+                          <p className="text-[12px] text-[#888780]">{scrap.company}</p>
                         </div>
                         <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${statusBadgeStyle[scrap.status]}`}>
                           {statusLabel[scrap.status]}

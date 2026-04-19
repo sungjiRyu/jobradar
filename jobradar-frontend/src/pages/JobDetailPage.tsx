@@ -87,7 +87,7 @@ const JobDetailPage = () => {
     <div className="max-w-[700px] mx-auto px-6 py-8">
       {/* 뒤로가기 */}
       <button
-        onClick={() => navigate("/")}
+        onClick={() => navigate(-1)}
         className="text-[13px] text-[#888780] hover:text-[#1A1A1A] mb-6 block"
       >
         ← 목록으로
@@ -129,7 +129,7 @@ const JobDetailPage = () => {
 
         {/* 마감일 + 조회수 */}
         <div className="flex justify-between items-center text-[13px] text-[#888780] border-t border-[#DDDDDD] pt-4">
-          <span>마감일: {job.deadline}</span>
+          <span>마감일: {job.deadline ?? "상시채용"}</span>
           <span>조회 {job.viewCount}회</span>
         </div>
       </div>
