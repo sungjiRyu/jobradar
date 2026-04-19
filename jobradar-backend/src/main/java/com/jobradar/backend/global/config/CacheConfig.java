@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -35,10 +37,17 @@ public class CacheConfig {
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
 
-        // 기본 캐시 설정: JDK 직렬화(기본값), null 캐싱 비허용, TTL 10분
+        // 기본 캐시 설정: JSON 직렬화, null 캐싱 비허용, TTL 10분
+        // GenericJackson2JsonRedisSerializer: 클래스 로더 정보 없이 JSON으로 저장
+        // → DevTools 재시작 후에도 ClassCastException 없이 정상 역직렬화 가능
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(10))
-                .disableCachingNullValues();
+                .disableCachingNullValues()
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(
+                                new GenericJackson2JsonRedisSerializer()
+                        )
+                );
 
         // 캐시별 TTL 개별 설정
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
