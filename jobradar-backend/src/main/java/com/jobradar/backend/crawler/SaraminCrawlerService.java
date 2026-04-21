@@ -266,4 +266,51 @@ public class SaraminCrawlerService implements CrawlerService {
 
         return result;
     }
+
+    /**
+     * 사람인 공고 상세 내용 크롤링
+     *
+     * [흐름]
+     * 1. sourceUrl에서 rec_idx 파라미터 추출 (예: ?...&rec_idx=53423962&...)
+     * 2. view-detail 엔드포인트 GET 요청 → SSR HTML 반환
+     * 3. div.user_content 전체 텍스트 추출
+     *    - 템플릿 형식(div.info-block)과 자유 형식(Google Docs 등) 모두 대응
+     *
+     * @param sourceUrl 저장된 공고 URL (rec_idx 포함)
+     * @return 공고 상세 텍스트 (파싱 실패 시 null)
+     */
+    public String fetchDescription(String sourceUrl) {
+        // rec_idx 추출: "rec_idx=12345" 패턴에서 숫자만 꺼냄
+        Matcher m = Pattern.compile("[?&]rec_idx=(\\d+)").matcher(sourceUrl);
+        if (!m.find()) {
+            log.warn("[사람인] rec_idx 파싱 실패: {}", sourceUrl);
+            return null;
+        }
+        String recIdx = m.group(1);
+        String detailUrl = BASE_URL + "/zf_user/jobs/relay/view-detail?rec_idx=" + recIdx + "&rec_seq=0";
+
+        try {
+            Document doc = Jsoup.connect(detailUrl)
+                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            + "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            + "Chrome/124.0.0.0 Safari/537.36")
+                    .header("Accept-Language", "ko-KR,ko;q=0.9")
+                    .timeout(10_000)
+                    .get();
+
+            // div.user_content 전체 텍스트 추출 (HTML 태그 제거, 공백 정리)
+            Element content = doc.selectFirst("div.user_content");
+            if (content == null) {
+                log.warn("[사람인] user_content 없음: rec_idx={}", recIdx);
+                return null;
+            }
+
+            String text = content.text().trim();
+            return text.isEmpty() ? null : text;
+
+        } catch (IOException e) {
+            log.error("[사람인] 상세 크롤링 실패: rec_idx={}, error={}", recIdx, e.getMessage());
+            return null;
+        }
+    }
 }
