@@ -29,7 +29,10 @@ public class Job {
     private String title;         // 공고 제목
 
     @Column(columnDefinition = "TEXT")
-    private String description;   // 공고 상세 내용
+    private String description;   // 공고 상세 내용 (사람인 view-detail 크롤링)
+
+    @Column(columnDefinition = "TEXT")
+    private String summary;       // AI 요약 (Gemini API, 최초 조회 시 생성)
 
     @Column(nullable = false, length = 50)
     private String location;      // 근무 지역 (예: 서울, 판교)
@@ -110,6 +113,16 @@ public class Job {
     /** 공고 마감 처리 */
     public void close() {
         this.status = JobStatus.CLOSED;
+    }
+
+    /** 상세 내용 저장 — 최초 상세 조회 시 크롤링 결과를 저장 */
+    public void updateDescription(String description) {
+        this.description = description;
+    }
+
+    /** AI 요약 저장 — 최초 상세 조회 시 Gemini API 결과를 저장 */
+    public void updateSummary(String summary) {
+        this.summary = summary;
     }
 
     // ===== 공고 상태 Enum =====
