@@ -14,7 +14,8 @@ interface JobDetail {
   id: number;
   company: string;
   title: string;
-  description: string;
+  description: string | null;
+  summary: string | null;
   location: string;
   experienceLevel: string;
   employmentType: string;
@@ -134,15 +135,29 @@ const JobDetailPage = () => {
         </div>
       </div>
 
+      {/* AI 요약 — summary가 있을 때만 표시 */}
+      {job.summary && (
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 mb-4">
+          <h2 className="text-[14px] font-semibold text-[#378ADD] mb-2 flex items-center gap-1.5">
+            🤖 AI 요약
+          </h2>
+          <p className="text-[14px] text-[#1A1A1A] leading-relaxed">
+            {job.summary}
+          </p>
+        </div>
+      )}
+
       {/* 상세 설명 */}
-      <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
-        <h2 className="text-[16px] font-semibold text-[#1A1A1A] mb-3">
-          상세 내용
-        </h2>
-        <p className="text-[14px] text-[#1A1A1A] leading-relaxed whitespace-pre-line">
-          {job.description}
-        </p>
-      </div>
+      {job.description && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
+          <h2 className="text-[16px] font-semibold text-[#1A1A1A] mb-3">
+            상세 내용
+          </h2>
+          <p className="text-[14px] text-[#1A1A1A] leading-relaxed whitespace-pre-line">
+            {job.description}
+          </p>
+        </div>
+      )}
 
       {/* 지원하기 버튼 */}
       <a
