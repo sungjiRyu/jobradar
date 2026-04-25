@@ -59,13 +59,12 @@ public class JobService {
         job.incrementViewCount();
 
         // 1) 사람인 공고이고 description이 없으면 크롤링
+        // desc가 null(이미지 공고 등)이면 ""로 저장해 다음 조회 때 재시도하지 않음
         if (job.getDescription() == null && "사람인".equals(job.getSourceSite())) {
             try {
                 String desc = saraminCrawlerService.fetchDescription(job.getSourceUrl());
-                if (desc != null) {
-                    job.updateDescription(desc);
-                    log.info("[JobService] description 크롤링 완료: jobId={}", jobId);
-                }
+                job.updateDescription(desc != null ? desc : "");
+                log.info("[JobService] description 크롤링 완료: jobId={}", jobId);
             } catch (Exception e) {
                 log.warn("[JobService] description 크롤링 실패: jobId={}, error={}", jobId, e.getMessage());
             }

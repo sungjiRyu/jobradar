@@ -168,6 +168,14 @@ const JobDetailPage = () => {
         </div>
       </div>
 
+      {/* 상세 내용 없는 경우 안내 */}
+      {!job.summary && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
+          <p className="text-[13px] text-[#888780] mb-1">이미지 형식의 공고입니다.</p>
+          <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
+        </div>
+      )}
+
       {/* 상세 내용 — AI 정리 결과 */}
       {job.summary && (() => {
         const data = parseSummary(job.summary!);
