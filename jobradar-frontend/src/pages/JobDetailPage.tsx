@@ -1,13 +1,6 @@
-/**
- * JobDetailPage — 채용공고 상세 페이지
- * URL의 id 파라미터로 GET /api/jobs/{id} API를 호출
- * 공고 상세 정보(회사명, 직무명, 설명, 기술스택, 마감일 등) 표시
- * 조회할 때마다 viewCount가 자동 증가됨 (백엔드 처리)
- */
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getJobById } from "../api/jobApi";
+import { getJobById, getJobSummary } from "../api/jobApi";
 
 // 상세 페이지용 공고 타입 (목록보다 필드가 더 많음)
 interface JobDetail {
@@ -28,7 +21,7 @@ interface JobDetail {
   createdAt: string;
 }
 
-// Gemini JSON 응답 타입
+// AI JSON 응답 타입
 interface JobSummaryJson {
   header: { summary: string };
   stacks: { core: string[]; infra: string[]; tools: string[] };
@@ -62,7 +55,6 @@ const Chip = ({ label, color = "blue" }: { label: string; color?: "blue" | "gray
 };
 
 const JobDetailPage = () => {
-  // URL에서 id 파라미터 추출 (예: /jobs/1 → id = "1")
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -70,12 +62,39 @@ const JobDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 컴포넌트 마운트 시 공고 상세 조회
+  // undefined: 로딩 중 / string: 완료
+  const [summary, setSummary] = useState<string | undefined>(undefined);
+  // true: 이미지 공고 (재시도 무의미) / false: AI 실패 (재시도 가능) / undefined: 아직 모름
+  const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | undefined>(undefined);
+
+  const fetchSummary = () => {
+    setSummaryFailReason(undefined);
+    setSummary(undefined);
+    getJobSummary(Number(id))
+      .then((r) => {
+        const data = r.data.data; // { summary, imageOnly }
+        if (data.summary) {
+          setSummary(data.summary);
+        } else {
+          setSummaryFailReason(data.imageOnly ? "imageOnly" : "aiFailed");
+        }
+      })
+      .catch(() => setSummaryFailReason("aiFailed"));
+  };
+
   useEffect(() => {
     const fetchJob = async () => {
       try {
         const res = await getJobById(Number(id));
-        setJob(res.data.data);
+        const jobData = res.data.data;
+        setJob(jobData);
+
+        // DB에 이미 summary가 있으면 바로 사용, 없으면 별도 요청
+        if (jobData.summary !== null) {
+          setSummary(jobData.summary);
+        } else {
+          fetchSummary();
+        }
       } catch (err: any) {
         if (err.response?.status === 404) {
           setError("존재하지 않는 채용공고입니다.");
@@ -116,6 +135,7 @@ const JobDetailPage = () => {
 
   // job이 null이면 아무것도 렌더링하지 않음
   if (!job) return null;
+ console.log("summary= " + summary);
 
   return (
     <div className="max-w-[700px] mx-auto px-6 py-8">
@@ -168,8 +188,42 @@ const JobDetailPage = () => {
         </div>
       </div>
 
-      {/* 상세 내용 없는 경우 안내 */}
-      {!job.summary && (
+      {/* AI 정리 로딩 중 — 스켈레톤 (summary도 failReason도 아직 없는 상태) */}
+      {summary === undefined && summaryFailReason === undefined && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+            <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-4/5 bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-3/5 bg-gray-100 rounded animate-pulse" />
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-5/6 bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-4/6 bg-gray-100 rounded animate-pulse" />
+          </div>
+        </div>
+      )}
+
+      {/* AI 요청 실패 — 재시도 가능 (Gemini 429, 네트워크 오류 등) */}
+      {summaryFailReason === "aiFailed" && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
+          <p className="text-[13px] text-[#888780] mb-3">상세 내용을 불러오지 못했습니다.</p>
+          <button
+            onClick={fetchSummary}
+            className="text-[13px] text-[#378ADD] hover:underline"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
+      {/* 이미지 공고 안내 — 재시도해도 결과 없음 */}
+      {summaryFailReason === "imageOnly" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-1">이미지 형식의 공고입니다.</p>
           <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
@@ -177,8 +231,8 @@ const JobDetailPage = () => {
       )}
 
       {/* 상세 내용 — AI 정리 결과 */}
-      {job.summary && (() => {
-        const data = parseSummary(job.summary!);
+      {summary && (() => {
+        const data = parseSummary(summary);
         if (!data) return null;
         return (
           <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">

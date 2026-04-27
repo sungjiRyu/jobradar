@@ -3,6 +3,7 @@ package com.jobradar.backend.job.controller;
 import com.jobradar.backend.global.common.ApiResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
+import com.jobradar.backend.job.dto.SummaryResponse;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,9 +37,15 @@ public class JobController {
         return ApiResponse.ok(jobService.search(keyword, location, experienceLevel, techStack, pageable));
     }
 
-    /** GET /api/jobs/{id} — 공고 상세 조회 (조회 시 viewCount 자동 증가) */
+    /** GET /api/jobs/{id} — 공고 상세 조회 (DB 조회만, 즉시 응답) */
     @GetMapping("/{id}")
     public ApiResponse<JobDetailResponse> getDetail(@PathVariable Long id) {
         return ApiResponse.ok(jobService.getDetail(id));
+    }
+
+    /** GET /api/jobs/{id}/summary — AI 정리 조회 (최초 시 크롤링 + AI 요청, 이후 캐시) */
+    @GetMapping("/{id}/summary")
+    public ApiResponse<SummaryResponse> getSummary(@PathVariable Long id) {
+        return ApiResponse.ok(jobService.getSummary(id));
     }
 }
