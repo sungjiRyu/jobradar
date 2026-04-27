@@ -259,6 +259,49 @@ public class JobkoreaCrawlerService implements CrawlerService {
     }
 
     /**
+     * 잡코리아 공고 상세 내용 크롤링
+     *
+     * 잡코리아는 Next.js RSC 앱으로, 실제 공고 HTML이 AWS S3 presigned URL로 제공됨.
+     * 1단계: 상세 페이지 HTML에서 RSC payload 안의 S3 URL 추출
+     * 2단계: S3 HTML 파일 직접 GET → body 텍스트 반환
+     *
+     * @param sourceUrl 저장된 공고 URL (https://www.jobkorea.co.kr/Recruit/GI_Read/{id})
+     * @return 공고 상세 텍스트 (파싱 실패 시 null)
+     */
+    public String fetchDescription(String sourceUrl) {
+        try {
+            Document mainDoc = Jsoup.connect(sourceUrl)
+                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            + "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            + "Chrome/124.0.0.0 Safari/537.36")
+                    .header("Accept-Language", "ko-KR,ko;q=0.9")
+                    .maxBodySize(0)
+                    .timeout(10_000)
+                    .get();
+
+            Matcher m = Pattern.compile("(https://job-hub-files[^\"]+_DESCRIPTION\\.html[^\"]+)")
+                    .matcher(mainDoc.html());
+            if (!m.find()) {
+                log.warn("[잡코리아] DESCRIPTION S3 URL 없음: {}", sourceUrl);
+                return null;
+            }
+            String s3Url = m.group(1).replace("\\u0026", "&");
+
+            Document descDoc = Jsoup.connect(s3Url)
+                    .userAgent("Mozilla/5.0")
+                    .timeout(10_000)
+                    .get();
+
+            String text = descDoc.body().text().trim();
+            return text.isEmpty() ? null : text;
+
+        } catch (IOException e) {
+            log.error("[잡코리아] 상세 크롤링 실패: url={}, error={}", sourceUrl, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * 공고 제목에서 기술스택 키워드 추출 후 DB 조회 또는 신규 생성
      */
     List<TechStack> resolveTechStacks(String title) {

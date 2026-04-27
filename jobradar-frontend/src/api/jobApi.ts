@@ -26,7 +26,10 @@ export const getJobById = (id: number) => {
   return api.get(`/api/jobs/${id}`);
 };
 
-// AI 정리 조회: GET /api/jobs/{id}/summary (크롤링 + AI 포함, 최초 10초 소요)
+export const getJobDescription = (id: number) => {
+  return api.get(`/api/jobs/${id}/description`);
+};
+
 export const getJobSummary = (id: number) => {
   return api.get(`/api/jobs/${id}/summary`);
 };

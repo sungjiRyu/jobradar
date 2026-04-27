@@ -43,7 +43,11 @@ public class JobController {
         return ApiResponse.ok(jobService.getDetail(id));
     }
 
-    /** GET /api/jobs/{id}/summary — AI 정리 조회 (최초 시 크롤링 + AI 요청, 이후 캐시) */
+    @GetMapping("/{id}/description")
+    public ApiResponse<String> getDescription(@PathVariable Long id) {
+        return ApiResponse.ok(jobService.getDescription(id));
+    }
+
     @GetMapping("/{id}/summary")
     public ApiResponse<SummaryResponse> getSummary(@PathVariable Long id) {
         return ApiResponse.ok(jobService.getSummary(id));
