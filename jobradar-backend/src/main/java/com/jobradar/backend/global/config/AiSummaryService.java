@@ -35,7 +35,7 @@ public class AiSummaryService {
               "header": { "summary": "One-line dev-focused catchphrase in Korean" },
               "stacks": { "core": ["languages/frameworks"], "infra": ["cloud/db"], "tools": ["dev-ops/collaboration tools"] },
               "details": { "tasks": ["core duties"], "reqs": ["mandatory qualifications"], "pref": ["preferred qualifications"] },
-              "conditions": { "type": "employment type", "location": "work location", "salary": "salary info or null" },
+              "conditions": { "type": "employment type", "location": "work location", "salary": "salary in Korean 만원 unit (e.g. '3000만원', '3000~4000만원') or null" },
               "culture": ["company culture keywords"],
               "insight": { "challenge": "anticipated technical challenge or growth point", "fit": "best suited developer profile" }
             }
