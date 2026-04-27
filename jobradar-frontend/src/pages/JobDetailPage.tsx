@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getJobById, getJobSummary } from "../api/jobApi";
+import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
 
 // 상세 페이지용 공고 타입 (목록보다 필드가 더 많음)
 interface JobDetail {
@@ -62,24 +62,57 @@ const JobDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // undefined: 로딩 중 / string: 완료
   const [summary, setSummary] = useState<string | undefined>(undefined);
-  // true: 이미지 공고 (재시도 무의미) / false: AI 실패 (재시도 가능) / undefined: 아직 모름
   const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | undefined>(undefined);
+  const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null);
+  const [dots, setDots] = useState("");
+  const dotsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSummary = () => {
+  const startDots = () => {
+    dotsIntervalRef.current = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? "" : prev + ".");
+    }, 500);
+  };
+
+  const stopDots = () => {
+    if (dotsIntervalRef.current) {
+      clearInterval(dotsIntervalRef.current);
+      dotsIntervalRef.current = null;
+    }
+    setDots("");
+  };
+
+  const fetchSummary = async (hasDescription: boolean) => {
     setSummaryFailReason(undefined);
     setSummary(undefined);
-    getJobSummary(Number(id))
-      .then((r) => {
-        const data = r.data.data; // { summary, imageOnly }
-        if (data.summary) {
-          setSummary(data.summary);
-        } else {
-          setSummaryFailReason(data.imageOnly ? "imageOnly" : "aiFailed");
+    startDots();
+
+    try {
+      if (!hasDescription) {
+        setLoadingStatus("crawling");
+        const descRes = await getJobDescription(Number(id));
+        const desc = descRes.data.data;
+        
+        if (!desc) {
+          setSummaryFailReason("imageOnly");
+          return;
         }
-      })
-      .catch(() => setSummaryFailReason("aiFailed"));
+      }
+
+      setLoadingStatus("ai");
+      const summaryRes = await getJobSummary(Number(id));
+      const data = summaryRes.data.data;
+      if (data.summary) {
+        setSummary(data.summary);
+      } else {
+        setSummaryFailReason(data.imageOnly ? "imageOnly" : "aiFailed");
+      }
+    } catch {
+      setSummaryFailReason("aiFailed");
+    } finally {
+      stopDots();
+      setLoadingStatus(null);
+    }
   };
 
   useEffect(() => {
@@ -89,11 +122,10 @@ const JobDetailPage = () => {
         const jobData = res.data.data;
         setJob(jobData);
 
-        // DB에 이미 summary가 있으면 바로 사용, 없으면 별도 요청
         if (jobData.summary !== null) {
           setSummary(jobData.summary);
         } else {
-          fetchSummary();
+          fetchSummary(!!jobData.description);
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -107,7 +139,9 @@ const JobDetailPage = () => {
     };
 
     fetchJob();
+    return () => stopDots();
   }, [id]);
+
 
   // 로딩 중
   if (loading) {
@@ -135,7 +169,8 @@ const JobDetailPage = () => {
 
   // job이 null이면 아무것도 렌더링하지 않음
   if (!job) return null;
- console.log("summary= " + summary);
+
+
 
   return (
     <div className="max-w-[700px] mx-auto px-6 py-8">
@@ -206,6 +241,11 @@ const JobDetailPage = () => {
             <div className="h-3 w-5/6 bg-gray-100 rounded animate-pulse" />
             <div className="h-3 w-4/6 bg-gray-100 rounded animate-pulse" />
           </div>
+          <p className="text-[12px] text-[#AAAAAA] text-center mt-4">
+            {loadingStatus === "crawling"
+              ? `채용공고 정보를 가져오는 중입니다${dots}`
+              : `AI가 공고 정보를 정리하고 있습니다${dots}`}
+          </p>
         </div>
       )}
 
@@ -214,7 +254,7 @@ const JobDetailPage = () => {
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-3">상세 내용을 불러오지 못했습니다.</p>
           <button
-            onClick={fetchSummary}
+            onClick={() => fetchSummary(!!job?.description)}
             className="text-[13px] text-[#378ADD] hover:underline"
           >
             다시 시도
