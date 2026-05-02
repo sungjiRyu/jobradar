@@ -38,7 +38,7 @@ public class ScrapController {
             @AuthenticationPrincipal String email,
             @Valid @RequestBody ScrapRequest request) {
 
-        return ApiResponse.ok("스크랩이 추가되었습니다.", scrapService.addScrap(email, request.getJobPostId()));
+        return ApiResponse.ok(scrapService.addScrap(email, request.getJobPostId()));
     }
 
     /**
@@ -53,7 +53,7 @@ public class ScrapController {
             @PathVariable("id") Long id) {
 
         scrapService.deleteScrap(email, id);
-        return ApiResponse.ok("스크랩이 삭제되었습니다.");
+        return ApiResponse.ok();
     }
 
     /**
@@ -82,6 +82,6 @@ public class ScrapController {
             @PathVariable("id") Long id,
             @Valid @RequestBody StatusUpdateRequest request) {
 
-        return ApiResponse.ok("스크랩 상태가 변경되었습니다.", scrapService.updateStatus(email, id, request.getStatus()));
+        return ApiResponse.ok(scrapService.updateStatus(email, id, request.getStatus()));
     }
 }
