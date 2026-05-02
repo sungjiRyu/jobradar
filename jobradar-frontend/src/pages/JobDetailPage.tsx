@@ -2,13 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
 
-// 상세 페이지용 공고 타입 (목록보다 필드가 더 많음)
+// ─────────────────────────────────────────────
+// 타입 정의
+// ─────────────────────────────────────────────
+
+// 상세 페이지에서 사용하는 공고 데이터 구조
 interface JobDetail {
   id: number;
   company: string;
   title: string;
-  description: string | null;
-  summary: string | null;
+  description: string | null; // 크롤링된 원문 (없으면 null)
+  summary: string | null;     // AI가 정리한 JSON 문자열 (없으면 null)
   location: string;
   experienceLevel: string;
   employmentType: string;
@@ -21,7 +25,7 @@ interface JobDetail {
   createdAt: string;
 }
 
-// AI JSON 응답 타입
+// AI가 반환하는 JSON 구조
 interface JobSummaryJson {
   header: { summary: string };
   stacks: { core: string[]; infra: string[]; tools: string[] };
@@ -31,7 +35,11 @@ interface JobSummaryJson {
   insight: { challenge: string | null; fit: string | null };
 }
 
-// summary JSON 파싱 (실패 시 null 반환)
+// ─────────────────────────────────────────────
+// 유틸 함수 & 공통 컴포넌트
+// ─────────────────────────────────────────────
+
+// AI 응답 문자열을 JSON으로 파싱 (실패 시 null 반환)
 const parseSummary = (raw: string): JobSummaryJson | null => {
   try {
     return JSON.parse(raw) as JobSummaryJson;
@@ -40,7 +48,7 @@ const parseSummary = (raw: string): JobSummaryJson | null => {
   }
 };
 
-// 태그 칩 컴포넌트
+// 기술스택 등에 사용하는 태그 칩 컴포넌트
 const Chip = ({ label, color = "blue" }: { label: string; color?: "blue" | "gray" | "purple" }) => {
   const styles = {
     blue: "bg-blue-50 text-[#378ADD]",
@@ -54,26 +62,37 @@ const Chip = ({ label, color = "blue" }: { label: string; color?: "blue" | "gray
   );
 };
 
+// ─────────────────────────────────────────────
+// 메인 컴포넌트
+// ─────────────────────────────────────────────
+
 const JobDetailPage = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id } = useParams();     // URL에서 공고 id 추출 (/jobs/123 → "123")
+  const navigate = useNavigate(); // 뒤로가기 등 페이지 이동에 사용
 
+  // ── 공고 기본 정보 상태 ──────────────────────
   const [job, setJob] = useState<JobDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true); // 공고 로딩 중 여부
+  const [error, setError] = useState("");       // 에러 메시지
 
+  // ── AI 요약 상태 ─────────────────────────────
   const [summary, setSummary] = useState<string | undefined>(undefined);
+  // undefined = 로딩 중, string = 완료, (summaryFailReason로 실패 구분)
   const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | undefined>(undefined);
-  const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null);
-  const [dots, setDots] = useState("");
-  const dotsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null); // 로딩 메시지 전환용
 
+  // ── 점(dots) 애니메이션 ───────────────────────
+  const [dots, setDots] = useState("");
+  const dotsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null); // interval ID 보관 (메모리 누수 방지)
+
+  // 0.5초마다 "." → ".." → "..." → "" 반복
   const startDots = () => {
     dotsIntervalRef.current = setInterval(() => {
       setDots(prev => prev.length >= 3 ? "" : prev + ".");
     }, 500);
   };
 
+  // interval 정리 (컴포넌트 언마운트 또는 로딩 완료 시 호출)
   const stopDots = () => {
     if (dotsIntervalRef.current) {
       clearInterval(dotsIntervalRef.current);
@@ -82,26 +101,32 @@ const JobDetailPage = () => {
     setDots("");
   };
 
+  // ── AI 요약 fetch ─────────────────────────────
+  // hasDescription: DB에 이미 원문이 있으면 true → 크롤링 단계 건너뜀
   const fetchSummary = async (hasDescription: boolean) => {
     setSummaryFailReason(undefined);
     setSummary(undefined);
     startDots();
 
     try {
+      // description이 없으면 먼저 크롤링
       if (!hasDescription) {
         setLoadingStatus("crawling");
         const descRes = await getJobDescription(Number(id));
         const desc = descRes.data.data;
-        
+
+        // 크롤링 결과가 없으면 이미지 공고로 판단 → AI 요약 불가
         if (!desc) {
           setSummaryFailReason("imageOnly");
           return;
         }
       }
 
+      // AI 요약 요청
       setLoadingStatus("ai");
       const summaryRes = await getJobSummary(Number(id));
       const data = summaryRes.data.data;
+
       if (data.summary) {
         setSummary(data.summary);
       } else {
@@ -115,17 +140,20 @@ const JobDetailPage = () => {
     }
   };
 
+  // ── 초기 데이터 로딩 ─────────────────────────
   useEffect(() => {
     const fetchJob = async () => {
       try {
         const res = await getJobById(Number(id));
         const jobData = res.data.data;
+        
         setJob(jobData);
 
+        // DB에 summary가 이미 있으면 바로 사용, 없으면 AI 요약 요청
         if (jobData.summary !== null) {
           setSummary(jobData.summary);
         } else {
-          fetchSummary(!!jobData.description);
+          fetchSummary(!!jobData.description); // !!로 string|null → boolean 변환
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -139,11 +167,13 @@ const JobDetailPage = () => {
     };
 
     fetchJob();
-    return () => stopDots();
+    return () => stopDots(); // 페이지 이탈 시 interval 정리
   }, [id]);
 
+  // ─────────────────────────────────────────────
+  // 얼리 리턴 (공고 로딩 전/오류 시 조기 반환)
+  // ─────────────────────────────────────────────
 
-  // 로딩 중
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -152,7 +182,6 @@ const JobDetailPage = () => {
     );
   }
 
-  // 에러 발생
   if (error) {
     return (
       <div className="max-w-[700px] mx-auto px-6 py-20 text-center">
@@ -167,13 +196,15 @@ const JobDetailPage = () => {
     );
   }
 
-  // job이 null이면 아무것도 렌더링하지 않음
   if (!job) return null;
 
-
+  // ─────────────────────────────────────────────
+  // 렌더링
+  // ─────────────────────────────────────────────
 
   return (
     <div className="max-w-[700px] mx-auto px-6 py-8">
+
       {/* 뒤로가기 */}
       <button
         onClick={() => navigate(-1)}
@@ -182,9 +213,9 @@ const JobDetailPage = () => {
         ← 목록으로
       </button>
 
-      {/* 상단 정보 */}
+      {/* ── 공고 기본 정보 카드 ── */}
       <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
-        {/* 회사명 + 출처 */}
+        {/* 회사명 + 출처 사이트 */}
         <div className="flex justify-between items-center mb-2">
           <span className="text-[13px] text-[#888780]">{job.company}</span>
           <span className="text-[12px] text-[#888780]">{job.sourceSite}</span>
@@ -195,7 +226,7 @@ const JobDetailPage = () => {
           {job.title}
         </h1>
 
-        {/* 기본 정보 */}
+        {/* 근무지역 · 경력 · 고용형태 */}
         <div className="flex gap-4 text-[13px] text-[#888780] mb-4">
           <span>{job.location}</span>
           <span>·</span>
@@ -223,7 +254,9 @@ const JobDetailPage = () => {
         </div>
       </div>
 
-      {/* AI 정리 로딩 중 — 스켈레톤 (summary도 failReason도 아직 없는 상태) */}
+      {/* ── AI 요약 영역 (4가지 상태) ── */}
+
+      {/* 1) 로딩 중: summary도 failReason도 아직 없는 상태 → 스켈레톤 UI */}
       {summary === undefined && summaryFailReason === undefined && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -249,7 +282,7 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* AI 요청 실패 — 재시도 가능 (Gemini 429, 네트워크 오류 등) */}
+      {/* 2) AI 실패: Gemini 오류 또는 네트워크 오류 → 재시도 버튼 */}
       {summaryFailReason === "aiFailed" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-3">상세 내용을 불러오지 못했습니다.</p>
@@ -262,7 +295,7 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* 이미지 공고 안내 — 재시도해도 결과 없음 */}
+      {/* 3) 이미지 공고: 텍스트 추출 불가 → 원본 링크 안내 */}
       {summaryFailReason === "imageOnly" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-1">이미지 형식의 공고입니다.</p>
@@ -270,7 +303,7 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* 상세 내용 — AI 정리 결과 */}
+      {/* 4) 요약 성공: JSON 파싱 후 섹션별 렌더링 */}
       {summary && (() => {
         const data = parseSummary(summary);
         if (!data) return null;
@@ -300,7 +333,7 @@ const JobDetailPage = () => {
               </p>
             )}
 
-            {/* 기술스택 */}
+            {/* 기술스택 (Core / Infra / Tools) */}
             {(data.stacks?.core?.length > 0 || data.stacks?.infra?.length > 0 || data.stacks?.tools?.length > 0) && (
               <div className="mb-4">
                 <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">🛠 기술스택</p>
@@ -415,7 +448,7 @@ const JobDetailPage = () => {
         );
       })()}
 
-      {/* 지원하기 버튼 */}
+      {/* ── 지원하기 버튼 ── */}
       <a
         href={job.sourceUrl}
         target="_blank"
