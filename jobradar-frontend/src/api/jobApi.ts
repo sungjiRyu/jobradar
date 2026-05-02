@@ -26,6 +26,14 @@ export const getJobById = (id: number) => {
   return api.get(`/api/jobs/${id}`);
 };
 
+export const getJobDescription = (id: number) => {
+  return api.get(`/api/jobs/${id}/description`);
+};
+
+export const getJobSummary = (id: number) => {
+  return api.get(`/api/jobs/${id}/summary`);
+};
+
 // 기술스택 목록 조회: GET /api/tech-stacks
 export const getTechStacks = () => {
   return api.get("/api/tech-stacks");

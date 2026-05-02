@@ -31,14 +31,9 @@ public class ApiResponse<T> {
         return new ApiResponse<>(true, "요청이 성공했습니다.", data);
     }
 
-    /** 성공 응답 (커스텀 메시지 + 데이터) */
-    public static <T> ApiResponse<T> ok(String message, T data) {
-        return new ApiResponse<>(true, message, data);
-    }
-
     /** 성공 응답 (데이터 없음) */
-    public static <T> ApiResponse<T> ok(String message) {
-        return new ApiResponse<>(true, message, null);
+    public static <T> ApiResponse<T> ok() {
+        return new ApiResponse<>(true, null, null);
     }
 
     /** 실패 응답 */

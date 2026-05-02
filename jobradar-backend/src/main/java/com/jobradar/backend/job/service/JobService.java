@@ -1,25 +1,33 @@
 package com.jobradar.backend.job.service;
 
+import com.jobradar.backend.crawler.JobkoreaCrawlerService;
+import com.jobradar.backend.crawler.SaraminCrawlerService;
+import com.jobradar.backend.global.config.AiSummaryService;
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
+import com.jobradar.backend.job.dto.SummaryResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 채용공고 서비스 */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobService {
 
     private final JobRepository jobRepository;
+    private final SaraminCrawlerService saraminCrawlerService;
+    private final JobkoreaCrawlerService jobkoreaCrawlerService;
+    private final AiSummaryService aiSummaryService;
 
-    /** 공고 목록 조회 및 검색 (키워드/지역/경력/기술스택 복합 필터, 페이지네이션) */
     @Transactional(readOnly = true)
     public Page<JobResponse> search(String keyword, String location,
                                     String experienceLevel, String techStack,
@@ -28,14 +36,58 @@ public class JobService {
                 .map(JobResponse::from);
     }
 
-    /** 공고 상세 조회 — 조회 시 viewCount 1 증가 */
     @Transactional
     public JobDetailResponse getDetail(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
-
         job.incrementViewCount();
-
         return JobDetailResponse.from(job);
+    }
+
+    @Transactional
+    public DescriptionResponse getDescription(Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+
+        if (job.getDescription() != null && !job.getDescription().isEmpty()) {
+            return DescriptionResponse.success(job.getDescription());
+        }
+
+        DescriptionResponse result = switch (job.getSourceSite()) {
+            case "사람인" -> saraminCrawlerService.fetchDescription(job.getSourceUrl());
+            case "잡코리아" -> jobkoreaCrawlerService.fetchDescription(job.getSourceUrl());
+            default -> DescriptionResponse.crawlFailed();
+        };
+
+        if ("SUCCESS".equals(result.getStatus())) {
+            job.updateDescription(result.getDescription());
+            log.info("[JobService] description 크롤링 완료: jobId={}", jobId);
+        }
+
+        return result;
+    }
+
+    @Transactional
+    public SummaryResponse getSummary(Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+
+        if (job.getSummary() != null) return SummaryResponse.success(job.getSummary());
+
+        boolean hasDescription = job.getDescription() != null && !job.getDescription().isEmpty();
+        if (!hasDescription) return SummaryResponse.imageOnly();
+
+        try {
+            String summary = aiSummaryService.summarize(job.getDescription());
+            if (summary != null) {
+                job.updateSummary(summary);
+                log.info("[JobService] AI 요약 완료: jobId={}", jobId);
+                return SummaryResponse.success(summary);
+            }
+        } catch (Exception e) {
+            log.warn("[JobService] AI 요약 실패: jobId={}, error={}", jobId, e.getMessage());
+        }
+
+        return SummaryResponse.aiFailed();
     }
 }

@@ -36,6 +36,6 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal String email) {
         authService.logout(email);
-        return ApiResponse.ok("로그아웃 되었습니다.");
+        return ApiResponse.ok();
     }
 }

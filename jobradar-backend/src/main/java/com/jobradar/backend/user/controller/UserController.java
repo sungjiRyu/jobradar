@@ -23,7 +23,7 @@ public class UserController {
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<UserResponse> signup(@Valid @RequestBody SignupRequest request) {
-        return ApiResponse.ok("회원가입이 완료되었습니다.", userService.signup(request));
+        return ApiResponse.ok(userService.signup(request));
     }
 
     /** GET /api/users/me - 내 정보 조회 */
@@ -44,13 +44,13 @@ public class UserController {
     public ApiResponse<Void> changePassword(@AuthenticationPrincipal String email,
                                             @Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(email, request);
-        return ApiResponse.ok("비밀번호가 변경되었습니다.");
+        return ApiResponse.ok();
     }
 
     /** DELETE /api/users/me - 회원 탈퇴 */
     @DeleteMapping("/me")
     public ApiResponse<Void> withdraw(@AuthenticationPrincipal String email) {
         userService.withdraw(email);
-        return ApiResponse.ok("회원 탈퇴가 완료되었습니다.");
+        return ApiResponse.ok();
     }
 }
