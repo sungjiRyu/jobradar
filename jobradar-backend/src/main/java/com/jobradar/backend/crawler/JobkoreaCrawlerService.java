@@ -1,5 +1,6 @@
 package com.jobradar.backend.crawler;
 
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.job.repository.JobRepository;
@@ -268,7 +269,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
      * @param sourceUrl 저장된 공고 URL (https://www.jobkorea.co.kr/Recruit/GI_Read/{id})
      * @return 공고 상세 텍스트 (파싱 실패 시 null)
      */
-    public String fetchDescription(String sourceUrl) {
+    public DescriptionResponse fetchDescription(String sourceUrl) {
         try {
             Document mainDoc = Jsoup.connect(sourceUrl)
                     .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -283,7 +284,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
                     .matcher(mainDoc.html());
             if (!m.find()) {
                 log.warn("[잡코리아] DESCRIPTION S3 URL 없음: {}", sourceUrl);
-                return null;
+                return DescriptionResponse.crawlFailed();
             }
             String s3Url = m.group(1).replace("\\u0026", "&");
 
@@ -293,11 +294,15 @@ public class JobkoreaCrawlerService implements CrawlerService {
                     .get();
 
             String text = descDoc.body().text().trim();
-            return text.isEmpty() ? null : text;
+            if (text.isEmpty()) {
+                boolean hasImage = !descDoc.body().select("img").isEmpty();
+                return hasImage ? DescriptionResponse.image() : DescriptionResponse.crawlFailed();
+            }
+            return DescriptionResponse.success(text);
 
         } catch (IOException e) {
             log.error("[잡코리아] 상세 크롤링 실패: url={}, error={}", sourceUrl, e.getMessage());
-            return null;
+            return DescriptionResponse.crawlFailed();
         }
     }
 

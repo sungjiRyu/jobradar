@@ -5,6 +5,7 @@ import com.jobradar.backend.crawler.SaraminCrawlerService;
 import com.jobradar.backend.global.config.AiSummaryService;
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
 import com.jobradar.backend.job.dto.SummaryResponse;
@@ -44,28 +45,26 @@ public class JobService {
     }
 
     @Transactional
-    public String getDescription(Long jobId) {
+    public DescriptionResponse getDescription(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
 
-        boolean needsCrawl = job.getDescription() == null || job.getDescription().isEmpty();
-        if (needsCrawl) {
-            try {
-                String desc = switch (job.getSourceSite()) {
-                    case "사람인" -> saraminCrawlerService.fetchDescription(job.getSourceUrl());
-                    case "잡코리아" -> jobkoreaCrawlerService.fetchDescription(job.getSourceUrl());
-                    default -> null;
-                };
-                if (desc != null) {
-                    job.updateDescription(desc);
-                    log.info("[JobService] description 크롤링 완료: jobId={}", jobId);
-                }
-            } catch (Exception e) {
-                log.warn("[JobService] description 크롤링 실패: jobId={}, error={}", jobId, e.getMessage());
-            }
+        if (job.getDescription() != null && !job.getDescription().isEmpty()) {
+            return DescriptionResponse.success(job.getDescription());
         }
 
-        return job.getDescription();
+        DescriptionResponse result = switch (job.getSourceSite()) {
+            case "사람인" -> saraminCrawlerService.fetchDescription(job.getSourceUrl());
+            case "잡코리아" -> jobkoreaCrawlerService.fetchDescription(job.getSourceUrl());
+            default -> DescriptionResponse.crawlFailed();
+        };
+
+        if ("SUCCESS".equals(result.getStatus())) {
+            job.updateDescription(result.getDescription());
+            log.info("[JobService] description 크롤링 완료: jobId={}", jobId);
+        }
+
+        return result;
     }
 
     @Transactional

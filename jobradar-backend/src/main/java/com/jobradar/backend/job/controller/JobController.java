@@ -1,6 +1,7 @@
 package com.jobradar.backend.job.controller;
 
 import com.jobradar.backend.global.common.ApiResponse;
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
 import com.jobradar.backend.job.dto.SummaryResponse;
@@ -44,7 +45,7 @@ public class JobController {
     }
 
     @GetMapping("/{id}/description")
-    public ApiResponse<String> getDescription(@PathVariable("id") Long id) {
+    public ApiResponse<DescriptionResponse> getDescription(@PathVariable("id") Long id) {
         return ApiResponse.ok(jobService.getDescription(id));
     }
 

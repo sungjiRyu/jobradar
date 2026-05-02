@@ -1,5 +1,6 @@
 package com.jobradar.backend.crawler;
 
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.job.repository.JobRepository;
@@ -274,11 +275,11 @@ public class SaraminCrawlerService implements CrawlerService {
      * @param sourceUrl 저장된 공고 URL (rec_idx 포함)
      * @return 공고 상세 텍스트 (파싱 실패 시 null)
      */
-    public String fetchDescription(String sourceUrl) {
+    public DescriptionResponse fetchDescription(String sourceUrl) {
         Matcher m = Pattern.compile("[?&]rec_idx=(\\d+)").matcher(sourceUrl);
         if (!m.find()) {
             log.warn("[사람인] rec_idx 파싱 실패: {}", sourceUrl);
-            return null;
+            return DescriptionResponse.crawlFailed();
         }
         String recIdx = m.group(1);
         String detailUrl = BASE_URL + "/zf_user/jobs/relay/view-detail?rec_idx=" + recIdx + "&rec_seq=0";
@@ -295,14 +296,18 @@ public class SaraminCrawlerService implements CrawlerService {
             Element content = doc.selectFirst("div.user_content");
             if (content == null) {
                 log.warn("[사람인] user_content 없음: rec_idx={}", recIdx);
-                return null;
+                return DescriptionResponse.crawlFailed();
             }
             String text = content.text().trim();
-            return text.isEmpty() ? null : text;
+            if (text.isEmpty()) {
+                boolean hasImage = !content.select("img").isEmpty();
+                return hasImage ? DescriptionResponse.image() : DescriptionResponse.crawlFailed();
+            }
+            return DescriptionResponse.success(text);
 
         } catch (IOException e) {
             log.error("[사람인] 상세 크롤링 실패: rec_idx={}, error={}", recIdx, e.getMessage());
-            return null;
+            return DescriptionResponse.crawlFailed();
         }
     }
 }

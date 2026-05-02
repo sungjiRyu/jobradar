@@ -78,7 +78,7 @@ const JobDetailPage = () => {
   // ── AI 요약 상태 ─────────────────────────────
   const [summary, setSummary] = useState<string | undefined>(undefined);
   // undefined = 로딩 중, string = 완료, (summaryFailReason로 실패 구분)
-  const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | undefined>(undefined);
+  const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | "crawlerFailed" | undefined>(undefined);
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null); // 로딩 메시지 전환용
 
   // ── 점(dots) 애니메이션 ───────────────────────
@@ -115,9 +115,12 @@ const JobDetailPage = () => {
         const descRes = await getJobDescription(Number(id));
         const desc = descRes.data.data;
 
-        // 크롤링 결과가 없으면 이미지 공고로 판단 → AI 요약 불가
-        if (!desc) {
+        if (desc.status === "IMAGE") {
           setSummaryFailReason("imageOnly");
+          return;
+        }
+        if (desc.status === "CRAWL_FAILED") {
+          setSummaryFailReason("crawlerFailed");
           return;
         }
       }
@@ -295,7 +298,20 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* 3) 이미지 공고: 텍스트 추출 불가 → 원본 링크 안내 */}
+      {/* 3) 크롤링 실패: 네트워크 오류 등 → 재시도 버튼 */}
+      {summaryFailReason === "crawlerFailed" && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
+          <p className="text-[13px] text-[#888780] mb-3">공고 정보를 가져오는데 실패했습니다.</p>
+          <button
+            onClick={() => fetchSummary(false)}
+            className="text-[13px] text-[#378ADD] hover:underline"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
+      {/* 5) 이미지 공고: 텍스트 추출 불가 → 원본 링크 안내 */}
       {summaryFailReason === "imageOnly" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-1">이미지 형식의 공고입니다.</p>
@@ -303,7 +319,7 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* 4) 요약 성공: JSON 파싱 후 섹션별 렌더링 */}
+      {/* 6) 요약 성공: JSON 파싱 후 섹션별 렌더링 */}
       {summary && (() => {
         const data = parseSummary(summary);
         if (!data) return null;
