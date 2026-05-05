@@ -3,6 +3,7 @@ package com.jobradar.backend.auth.controller;
 import com.jobradar.backend.auth.dto.LoginRequest;
 import com.jobradar.backend.auth.dto.RefreshRequest;
 import com.jobradar.backend.auth.dto.TokenResponse;
+import com.jobradar.backend.auth.dto.VerifyPasswordRequest;
 import com.jobradar.backend.auth.service.AuthService;
 import com.jobradar.backend.global.common.ApiResponse;
 import jakarta.validation.Valid;
@@ -36,6 +37,16 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal String email) {
         authService.logout(email);
+        return ApiResponse.ok();
+    }
+
+    /** POST /api/auth/verify-password - 현재 비밀번호 확인 */
+    @PostMapping("/verify-password")
+    public ApiResponse<Void> verifyPassword(
+            @AuthenticationPrincipal String email,
+            @Valid @RequestBody VerifyPasswordRequest request) {
+
+        authService.verifyPassword(email, request.getPassword());
         return ApiResponse.ok();
     }
 }
