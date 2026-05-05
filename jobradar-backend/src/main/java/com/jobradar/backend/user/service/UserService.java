@@ -62,12 +62,7 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 현재 비밀번호가 맞는지 확인 (본인 인증)
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.INVALID_PASSWORD);
-        }
-
-        // 새 비밀번호를 암호화하여 저장
+        // 새 비밀번호를 암호화하여 저장 (현재 비밀번호 확인은 /api/auth/verify-password에서 선행)
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
     }
 

@@ -88,4 +88,14 @@ public class AuthService {
     public void logout(String email) {
         redisTemplate.delete(REFRESH_KEY_PREFIX + email);
     }
+
+    /** 비밀번호 확인: 현재 비밀번호 일치 여부 검증 */
+    public void verifyPassword(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+        }
+    }
 }

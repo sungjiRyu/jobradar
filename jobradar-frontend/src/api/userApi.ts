@@ -16,8 +16,8 @@ export const updateNickname = (nickname: string) => {
 };
 
 // 비밀번호 변경: PATCH /api/users/me/password
-export const updatePassword = (newPassword: string, newPasswordConfirm: string) => {
-  return api.patch("/api/users/me/password", { newPassword, newPasswordConfirm });
+export const updatePassword = (newPassword: string) => {
+  return api.patch("/api/users/me/password", { newPassword });
 };
 
 // 회원 탈퇴: DELETE /api/users/me

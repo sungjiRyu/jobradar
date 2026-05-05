@@ -72,7 +72,7 @@ const EditProfilePage = () => {
     try {
       setPasswordLoading(true);
       setPasswordMsg({ type: "", text: "" });
-      await updatePassword(newPassword, newPasswordConfirm);
+      await updatePassword(newPassword);
       setNewPassword("");
       setNewPasswordConfirm("");
       setPasswordMsg({ type: "success", text: "비밀번호가 변경되었습니다." });
