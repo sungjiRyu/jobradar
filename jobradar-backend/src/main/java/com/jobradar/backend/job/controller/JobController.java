@@ -13,6 +13,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /** 채용공고 컨트롤러 */
 @RestController
 @RequestMapping("/api/jobs")
@@ -27,15 +29,22 @@ public class JobController {
      *
      * 공고 목록 조회 및 검색 (모든 파라미터 선택사항)
      */
+    /**
+     * GET /api/jobs
+     * GET /api/jobs?keyword=카카오&location=서울&location=경기&experienceLevel=신입&techStack=Java&techStack=React
+     *
+     * location, experienceLevel, techStack 은 반복 파라미터로 복수 전달 가능
+     * 예: ?location=서울&location=경기 → List.of("서울", "경기")
+     */
     @GetMapping
     public ApiResponse<Page<JobResponse>> search(
             @RequestParam(name = "keyword", required = false) String keyword,
-            @RequestParam(name = "location", required = false) String location,
-            @RequestParam(name = "experienceLevel", required = false) String experienceLevel,
-            @RequestParam(name = "techStack", required = false) String techStack,
+            @RequestParam(name = "location", required = false) List<String> locations,
+            @RequestParam(name = "experienceLevel", required = false) List<String> experiences,
+            @RequestParam(name = "techStack", required = false) List<String> techStacks,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        return ApiResponse.ok(jobService.search(keyword, location, experienceLevel, techStack, pageable));
+        return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, pageable));
     }
 
     /** GET /api/jobs/{id} — 공고 상세 조회 (DB 조회만, 즉시 응답) */

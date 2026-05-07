@@ -4,11 +4,15 @@ import com.jobradar.backend.job.entity.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** 채용공고 레포지토리 */
-public interface JobRepository extends JpaRepository<Job, Long> {
+/**
+ * 채용공고 레포지토리
+ * JpaSpecificationExecutor: 동적 검색 조건(Specification)을 지원하기 위해 추가
+ */
+public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificationExecutor<Job> {
 
     /**
      * 중복 공고 체크 - sourceUrl 기준
