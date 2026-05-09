@@ -1,0 +1,38 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths: ['jobradar-backend/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'corretto'
+
+      - name: Build
+        run: ./gradlew build -x test
+        working-directory: jobradar-backend
+
+      - name: Transfer JAR to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          source: jobradar-backend/build/libs/jobradar-backend-0.0.1-SNAPSHOT.jar
+          target: ~/
+
+      - name: Restart Spring Boot
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_KEY }}
+          script: sudo systemctl restart jobradar

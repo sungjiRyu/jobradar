@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8080",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
   withCredentials: true,
 });
 
@@ -29,7 +29,7 @@ api.interceptors.response.use(
         const refreshToken = localStorage.getItem("refreshToken");
 
         // 토큰 재발급 요청
-        const res = await axios.post("http://localhost:8080/api/auth/refresh", {
+        const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/auth/refresh`, {
           refreshToken,
         });
 
