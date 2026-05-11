@@ -8,6 +8,7 @@ import com.jobradar.backend.job.dto.SummaryResponse;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -43,6 +44,14 @@ public class JobController {
             @RequestParam(name = "experienceLevel", required = false) List<String> experiences,
             @RequestParam(name = "techStack", required = false) List<String> techStacks,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        // deadline 정렬 요청 시 NULL 공고를 맨 뒤로 배치 (nullsLast)
+        // MySQL은 ASC에서 NULL을 가장 앞에 놓기 때문에 별도 처리 필요
+        boolean isDeadlineSort = pageable.getSort().getOrderFor("deadline") != null;
+        if (isDeadlineSort) {
+            Sort sort = Sort.by(Sort.Order.asc("deadline").nullsLast());
+            pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+        }
 
         return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, pageable));
     }

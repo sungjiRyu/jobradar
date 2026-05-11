@@ -7,6 +7,8 @@ import JobCard from "../components/job/JobCard";
 import Pagination from "../components/job/Pagination";
 import Sidebar from "../components/layout/Sidebar";
 import type { Job } from "../components/job/JobCard";
+import { getStatsToday } from "../api/statsApi";
+import type { TodayStats } from "../api/statsApi";
 
 const INITIAL_FILTER: FilterState = {
   keyword: "",
@@ -14,6 +16,7 @@ const INITIAL_FILTER: FilterState = {
   locations: [],
   experiences: [],
   techStacks: [],
+  sort: "",
 };
 
 const JobListPage = () => {
@@ -29,6 +32,7 @@ const JobListPage = () => {
   const [error, setError] = useState("");
   const [totalPages, setTotalPages] = useState(0);
   const [currentFilter, setCurrentFilter] = useState<FilterState>(INITIAL_FILTER);
+  const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
 
   // 페이지 변경 (Pagination은 0-based → URL은 1-based로 저장)
   const handlePageChange = (newPage: number) => {
@@ -42,6 +46,13 @@ const JobListPage = () => {
     setCurrentFilter(filter);
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
+
+  // 오늘의 현황 통계 (최초 1회)
+  useEffect(() => {
+    getStatsToday()
+      .then(res => setTodayStats(res.data.data))
+      .catch(err => console.error("통계 조회 실패:", err));
+  }, []);
 
   // currentFilter 또는 page 변경 시 API 재호출
   useEffect(() => {
@@ -60,6 +71,7 @@ const JobListPage = () => {
         if (currentFilter.locations.length > 0) params.location = currentFilter.locations;
         if (currentFilter.experiences.length > 0) params.experienceLevel = currentFilter.experiences;
         if (currentFilter.techStacks.length > 0) params.techStack = currentFilter.techStacks;
+        if (currentFilter.sort) params.sort = currentFilter.sort;
 
         const res = await getJobs(params);
         setJobs(res.data.data.content);
@@ -78,8 +90,25 @@ const JobListPage = () => {
   return (
     <div className="max-w-[1100px] mx-auto px-6 py-6">
       {/* 검색 + 필터 */}
-      <div className="mb-6">
+      <div className="mb-4">
         <SearchFilter onFilterChange={handleFilterChange} />
+      </div>
+
+      {/* 오늘의 현황 카드 */}
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        {[
+          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]" },
+          { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]" },
+          { label: "마감 임박", value: todayStats?.urgentCount, color: "text-[#E24B4A]" },
+          { label: "신입 공고", value: todayStats?.juniorCount, color: "text-[#1D9E75]" },
+        ].map(item => (
+          <div key={item.label} className="bg-white rounded-[10px] border border-[#DDDDDD] px-4 py-3 flex flex-col gap-0.5">
+            <span className="text-[11px] text-[#888780]">{item.label}</span>
+            <span className={`text-[20px] font-bold ${item.color}`}>
+              {item.value != null ? item.value.toLocaleString() : "-"}
+            </span>
+          </div>
+        ))}
       </div>
 
       <div className="flex gap-6">
