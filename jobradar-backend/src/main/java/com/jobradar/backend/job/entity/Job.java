@@ -67,6 +67,15 @@ public class Job {
     )
     private List<TechStack> techStacks = new ArrayList<>();
 
+    // 직무 분류 (백엔드, 프론트엔드, 풀스택, 모바일, 데이터, AI/ML, DevOps)
+    // 크롤러가 카테고리 코드 기반으로 수집 시 설정됨
+    @Column(length = 30)
+    private String jobType;
+
+    // 공고 게시일 (사이트에 등록/수정된 날짜)
+    // 등록일순 정렬에 사용. null이면 createdAt(크롤링 시각) 기준으로 대체됨
+    private LocalDate listedAt;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
@@ -89,7 +98,8 @@ public class Job {
     @Builder
     public Job(String company, String title, String description, String location,
                String experienceLevel, String employmentType,
-               LocalDate deadline, String sourceUrl, String sourceSite) {
+               LocalDate deadline, String sourceUrl, String sourceSite,
+               String jobType, LocalDate listedAt) {
         this.company = company;
         this.title = title;
         this.description = description;
@@ -99,6 +109,8 @@ public class Job {
         this.deadline = deadline;
         this.sourceUrl = sourceUrl;
         this.sourceSite = sourceSite;
+        this.jobType = jobType;
+        this.listedAt = listedAt;
         this.status = JobStatus.ACTIVE;
         this.viewCount = 0;
     }

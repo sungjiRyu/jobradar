@@ -45,7 +45,8 @@ class SaraminCrawlerServiceTest {
         // when
         boolean saved = saraminCrawlerService.saveJob(
                 "Java 백엔드 개발자", "테스트회사", "서울", "신입",
-                "~04/30(수)", "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=12345"
+                "~04/30(수)", "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=12345",
+                "백엔드", null, "정규직"
         );
 
         // then: 중복이므로 save() 미호출
@@ -64,7 +65,8 @@ class SaraminCrawlerServiceTest {
         // when
         boolean saved = saraminCrawlerService.saveJob(
                 "Spring Boot 백엔드 개발자", "새회사", "서울", "경력 3년",
-                "~05/31(금)", "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=99999"
+                "~05/31(금)", "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=99999",
+                "백엔드", null, "정규직"
         );
 
         // then
