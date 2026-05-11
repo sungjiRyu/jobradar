@@ -10,26 +10,28 @@ export interface FilterState {
   locations: string[];      // 지역: 복수 선택
   experiences: string[];    // 경력: 복수 선택
   techStacks: string[];     // 기술스택: 복수 선택
+  sort: string;             // 정렬: 단일 선택 (빈 문자열 = 최신순 기본값)
 }
 
 export interface SearchFilterProps {
   onFilterChange: (filter: FilterState) => void;
 }
 
-// 드롭다운 종류 식별자
+// 드롭다운 필터 4종 (label === value, 루프로 렌더링)
 type FilterKey = "job" | "locations" | "experiences" | "techStacks";
 
 // ─────────────────────────────────────────────
 // 필터 옵션 데이터
 // ─────────────────────────────────────────────
 
+// 일반 필터 설정 (직무/지역/경력/기술스택)
 const FILTER_CONFIG: Record<FilterKey, {
   label: string;
   options: string[];
-  multi: boolean;           // true: 복수 선택 / false: 단일 선택
-  activeBtn: string;        // 선택값 있을 때 버튼 스타일
-  badge: string;            // 선택 개수 뱃지 배경색
-  checkBox: string;         // 선택된 항목 체크박스 스타일
+  multi: boolean;       // true: 복수 선택 / false: 단일 선택
+  activeBtn: string;    // 선택값 있을 때 버튼 스타일
+  badge: string;        // 복수 선택 개수 뱃지 배경색
+  checkBox: string;     // 선택된 항목 체크박스 스타일
 }> = {
   job: {
     label: "직무",
@@ -49,8 +51,7 @@ const FILTER_CONFIG: Record<FilterKey, {
   },
   experiences: {
     label: "경력",
-    // DB 저장 형태: "신입", "경력무관", "경력1년↑", "경력3년↑", "경력5년↑", "경력10년↑"
-    // LIKE '%value%' 로 검색하므로 DB 값에 포함되는 문자열을 사용
+    // DB 저장 형태에 포함되는 문자열로 LIKE 검색
     options: ["신입", "경력무관", "경력1년", "경력3년", "경력5년", "경력10년"],
     multi: true,
     activeBtn: "bg-[#EEEDFE] text-[#3C3489] border-[#7F77DD]",
@@ -67,7 +68,15 @@ const FILTER_CONFIG: Record<FilterKey, {
   },
 };
 
-const FILTER_KEYS: FilterKey[] = ["job", "locations", "experiences", "techStacks"];
+const MAIN_FILTER_KEYS: FilterKey[] = ["job", "locations", "experiences", "techStacks"];
+
+// 정렬 옵션 (label: 화면 표시, value: API 전달값)
+// label ≠ value 이므로 일반 필터와 별도로 관리
+const SORT_OPTIONS = [
+  { label: "등록일순", value: "" },
+  { label: "마감일순", value: "deadline,ASC" },
+  { label: "조회수순", value: "viewCount,DESC" },
+];
 
 const INITIAL_FILTER: FilterState = {
   keyword: "",
@@ -75,6 +84,7 @@ const INITIAL_FILTER: FilterState = {
   locations: [],
   experiences: [],
   techStacks: [],
+  sort: "",
 };
 
 // ─────────────────────────────────────────────
@@ -88,7 +98,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
   // 현재 열린 드롭다운 패널 (하나만 열림)
   const [openPanel, setOpenPanel] = useState<FilterKey | null>(null);
 
-  // 각 패널 내부 검색창 입력값
+  // 각 패널 내부 검색창 입력값 (정렬은 옵션이 3개뿐이라 검색 불필요하지만 타입 통일)
   const [panelSearches, setPanelSearches] = useState<Record<FilterKey, string>>({
     job: "",
     locations: "",
@@ -123,7 +133,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
     setPanelSearches(prev => ({ ...prev, [key]: "" }));
   };
 
-  // 항목 선택 (직무: 단일, 나머지: 복수 토글)
+  // 일반 필터 항목 선택 (직무: 단일, 나머지: 복수 토글)
   const handleSelect = (key: FilterKey, value: string) => {
     setFilter(prev => {
       if (key === "job") {
@@ -135,6 +145,12 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
         [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value],
       };
     });
+  };
+
+  // 정렬 선택 (단일 선택 후 패널 닫기)
+  const handleSortSelect = (value: string) => {
+    setFilter(prev => ({ ...prev, sort: value }));
+    setOpenPanel(null);
   };
 
   // 특정 필터만 초기화
@@ -179,8 +195,8 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
   // 특정 값이 선택되어 있는지 여부
   const isSelected = (key: FilterKey, value: string) => getSelected(key).includes(value);
 
-  // 활성 태그 목록 (모든 필터 합산)
-  const activeTags = FILTER_KEYS.flatMap(key =>
+  // 활성 태그 목록 (정렬은 태그에 표시하지 않음)
+  const activeTags = MAIN_FILTER_KEYS.flatMap(key =>
     getSelected(key).map(value => ({ key, value }))
   );
 
@@ -202,7 +218,6 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
             placeholder="검색어를 입력하세요"
             className="w-full h-[40px] bg-[#F5F5F5] border border-[#DDDDDD] rounded-[8px] px-3 pr-8 text-[13px] outline-none transition-all focus:border-[#378ADD] focus:bg-white focus:shadow-[0_0_0_3px_rgba(55,138,221,0.08)]"
           />
-          {/* 검색어 초기화 버튼 */}
           {keywordInput && (
             <button
               onClick={handleClearKeyword}
@@ -224,8 +239,10 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
       <div className="h-px bg-[#F0F0F0] mb-4" />
 
       {/* ── 드롭다운 버튼 행 ── */}
-      <div className="flex gap-2 flex-wrap">
-        {FILTER_KEYS.map(key => {
+      <div className="flex items-center gap-2 flex-wrap">
+
+        {/* 일반 필터 4종 (직무/지역/경력/기술스택) — FILTER_CONFIG 기반 루프 */}
+        {MAIN_FILTER_KEYS.map(key => {
           const config = FILTER_CONFIG[key];
           const selected = getSelected(key);
           const isActive = selected.length > 0;
@@ -249,10 +266,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
                     {selected.length}
                   </span>
                 )}
-                {/* 화살표 (열리면 180도 회전) */}
-                <span className={`text-[10px] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
-                  ▾
-                </span>
+                <span className={`text-[10px] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>▾</span>
               </button>
 
               {/* 드롭다운 패널 */}
@@ -281,7 +295,6 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
                             onClick={() => handleSelect(key, opt)}
                             className="w-full flex items-center gap-2 px-3 py-[7px] text-[12px] text-[#555] hover:bg-[#F8F8F8] text-left"
                           >
-                            {/* 체크박스 */}
                             <span className={`flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors ${checked ? config.checkBox : "border-[#DDDDDD] bg-white"}`}>
                               {checked && (
                                 <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
@@ -310,9 +323,26 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
             </div>
           );
         })}
+
+        {/* 정렬 버튼 — 기존 필터 버튼 스타일과 동일, 오른쪽 끝 배치 */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => handleSortSelect(opt.value)}
+              className={`h-[34px] px-3 rounded-[8px] border text-[12px] transition-all
+                ${filter.sort === opt.value
+                  ? "bg-[#E6F1FB] text-[#0C447C] border-[#378ADD]"
+                  : "bg-white text-[#555] border-[#DDDDDD] hover:border-[#BBBBBB]"
+                }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ── 활성 필터 태그 ── */}
+      {/* ── 활성 필터 태그 (정렬은 표시 안 함) ── */}
       <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
         {activeTags.length === 0 ? (
           <p className="text-[11px] text-[#CCCCCC] italic">적용된 필터 없음</p>
