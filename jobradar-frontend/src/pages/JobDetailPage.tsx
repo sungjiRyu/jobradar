@@ -160,7 +160,7 @@ const JobDetailPage = () => {
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
-          setError("존재하지 않는 채용공고입니다.");
+          navigate("/not-found", { replace: true });
         } else {
           setError("공고를 불러오는데 실패했습니다.");
         }
