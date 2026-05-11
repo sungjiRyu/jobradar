@@ -43,25 +43,20 @@ const Navbar = () => {
         >
           대시보드
         </button>
-        {user && (
-          <button
-            onClick={() => navigate("/my")}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-              isActive("/my")
-                ? "text-[#378ADD] font-medium"
-                : "text-[#888780] hover:text-[#1A1A1A]"
-            }`}
-          >
-            마이페이지
-          </button>
-        )}
       </div>
 
       {/* 우측 영역 */}
       <div className="ml-auto flex items-center gap-3">
         {user ? (
           <>
-            <span className="text-sm text-[#1A1A1A]">{user.nickname}</span>
+            <button
+              onClick={() => navigate("/my")}
+              className={`text-sm transition-colors ${
+                isActive("/my") ? "text-[#378ADD] font-medium" : "text-[#888780] hover:text-[#1A1A1A]"
+              }`}
+            >
+              마이페이지
+            </button>
             <button
               onClick={handleLogout}
               className="text-sm text-[#888780] hover:text-[#1A1A1A]"
@@ -70,12 +65,20 @@ const Navbar = () => {
             </button>
           </>
         ) : (
-          <button
-            onClick={() => navigate("/login")}
-            className="text-sm bg-[#378ADD] text-white px-4 py-1.5 rounded-md hover:opacity-90"
-          >
-            로그인
-          </button>
+          <>
+            <button
+              onClick={() => navigate("/signup")}
+              className="text-sm text-[#378ADD] px-4 py-1.5 rounded-md border border-[#378ADD] hover:opacity-90"
+            >
+              회원가입
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="text-sm bg-[#378ADD] text-white px-4 py-1.5 rounded-md hover:opacity-90"
+            >
+              로그인
+            </button>
+          </>
         )}
       </div>
     </nav>
