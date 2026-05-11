@@ -63,9 +63,9 @@ const JobListPage = () => {
       try {
         const params: Record<string, string | number | string[]> = { page, size: 10 };
 
-        // 직무(job)와 키워드 중 직무가 우선 (둘 다 있으면 직무로 검색)
-        const effectiveKeyword = currentFilter.job ?? currentFilter.keyword;
-        if (effectiveKeyword) params.keyword = effectiveKeyword;
+        // 키워드는 제목/회사명 검색, 직무(job)는 jobType 파라미터로 별도 전달
+        if (currentFilter.keyword) params.keyword = currentFilter.keyword;
+        if (currentFilter.job) params.jobType = currentFilter.job;
 
         // location, experienceLevel, techStack: 배열로 전달 → axios가 ?location=서울&location=경기 형태로 직렬화
         if (currentFilter.locations.length > 0) params.location = currentFilter.locations;

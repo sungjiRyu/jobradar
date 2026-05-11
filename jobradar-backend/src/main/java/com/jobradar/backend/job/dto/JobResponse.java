@@ -19,6 +19,7 @@ public class JobResponse {
     private final List<String> techStacks;  // 기술스택 이름 목록
     private final LocalDate deadline;
     private final String sourceSite;
+    private final String jobType;
     private final int viewCount;
 
     private JobResponse(Job job) {
@@ -34,6 +35,7 @@ public class JobResponse {
                 .toList();
         this.deadline = job.getDeadline();
         this.sourceSite = job.getSourceSite();
+        this.jobType = job.getJobType();
         this.viewCount = job.getViewCount();
     }
 

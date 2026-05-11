@@ -71,6 +71,15 @@ public class JobSpecification {
     }
 
     /**
+     * 직무 분류 IN 절 (완전 일치)
+     * "백엔드" → jobType = '백엔드'
+     * 복수 선택 시 OR 조건: jobType IN ('백엔드', '풀스택')
+     */
+    public static Specification<Job> hasJobType(List<String> jobTypes) {
+        return (root, query, cb) -> root.get("jobType").in(jobTypes);
+    }
+
+    /**
      * 기술스택 이름 IN 절 (다중값 완전 일치)
      * distinct() 는 서비스에서 처리
      */
