@@ -45,7 +45,8 @@ class JobkoreaCrawlerServiceTest {
         // when
         boolean saved = jobkoreaCrawlerService.saveJob(
                 "Java 백엔드 개발자", "테스트회사", "서울", "신입",
-                "~05/10(일)", "https://www.jobkorea.co.kr/Recruit/GI_Read/12345"
+                "~05/10(일)", "https://www.jobkorea.co.kr/Recruit/GI_Read/12345",
+                "백엔드", null, "정규직"
         );
 
         // then
@@ -64,7 +65,8 @@ class JobkoreaCrawlerServiceTest {
         // when
         boolean saved = jobkoreaCrawlerService.saveJob(
                 "React 프론트엔드 개발자", "새회사", "서울 강남구", "경력 2년",
-                "~05/31(토)", "https://www.jobkorea.co.kr/Recruit/GI_Read/99999"
+                "~05/31(토)", "https://www.jobkorea.co.kr/Recruit/GI_Read/99999",
+                "프론트엔드", null, "정규직"
         );
 
         // then

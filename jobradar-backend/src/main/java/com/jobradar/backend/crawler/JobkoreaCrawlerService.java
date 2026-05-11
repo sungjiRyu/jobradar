@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,24 +25,27 @@ import java.util.regex.Pattern;
  * 잡코리아 채용공고 크롤러
  *
  * [크롤링 흐름]
- * 1. Jsoup으로 잡코리아 개발자 공고 목록 페이지 HTML 요청
- * 2. CSS 선택자로 공고 정보 추출 (제목, 회사명, 지역, 경력, 마감일, URL)
- * 3. DB 중복 체크 → 이미 있는 공고면 스킵
- * 4. 공고 제목에서 기술스택 키워드 파싱
- * 5. 기술스택 없으면 DB에 새로 INSERT
- * 6. Job 엔티티 저장 (job_posts 테이블)
- * 7. 기술스택 연결 저장 (job_post_stacks 테이블)
+ * 1. JOB_TYPE_DUTIES 직무 목록을 순회하며 직무별로 공고 수집
+ * 2. Jsoup POST /Recruit/Home/_GI_List/ (AJAX 엔드포인트)으로 공고 목록 HTML 요청
+ *    - duty 파라미터로 직무 지정 (잡코리아 직종 코드)
+ *    - 브라우저 JavaScript가 사용하는 POST 방식이므로 GET 방식 불가
+ * 3. CSS 선택자로 공고 정보 추출 (제목, 회사명, 지역, 경력, 마감일, 게시일, URL)
+ * 4. DB 중복 체크 → 이미 있는 공고면 스킵
+ * 5. 한 페이지가 모두 중복이면 조기 종료
  *
  * [잡코리아 HTML 구조]
- * tr.devloopArea                              ← 공고 항목
+ * tr.devloopArea
  *   td.tplCo > a.link                         ← 회사명
  *   td.tplTit > strong > a[href]              ← 공고 제목 + URL
  *   td.tplTit > p.etc > span.cell[0]          ← 경력 (예: "신입·경력")
  *   td.tplTit > p.etc > span.cell[2]          ← 지역 (예: "서울 강남구")
  *   td.odd > span.date                        ← 마감일 (예: "~05/10(일)")
+ *   td.odd > span.time                        ← 게시일 (예: "3시간 전 등록", "1일 전 등록")
  *
- * [직무 필터 코드]
- * 백엔드개발자: 1000229 / 프론트엔드개발자: 1000230 / 웹개발자: 1000231
+ * [직무 코드 (duty)]
+ * 1000229: 백엔드 / 1000230: 프론트엔드 / 1000231: 웹개발(풀스택)
+ * 1000232: 모바일 / 1000236,1000237,1000418: 데이터
+ * 1000242,1000417: AI/ML
  */
 @Slf4j
 @Service
@@ -54,13 +58,24 @@ public class JobkoreaCrawlerService implements CrawlerService {
     static final String BASE_URL = "https://www.jobkorea.co.kr";
 
     // 잡코리아 공고 목록 AJAX 엔드포인트
-    // - GET /recruit/joblist 는 SSR로 1페이지만 반환하며 Page 파라미터를 무시함
-    // - 브라우저에서 페이지 이동 시 JavaScript가 이 POST URL을 호출하여 HTML 조각을 받아옴
-    // - Jsoup은 JavaScript를 실행할 수 없으므로 이 POST 엔드포인트를 직접 호출해야 페이지 이동 가능
+    // GET /recruit/joblist 는 SSR로 1페이지만 반환하며 Page 파라미터를 무시함
+    // 브라우저 페이지 이동 시 JavaScript가 이 POST URL을 호출하므로 직접 POST해야 함
     static final String POST_URL = BASE_URL + "/Recruit/Home/_GI_List/";
 
-    // 최대 페이지 수 (안전장치): 빈 페이지 감지 시 자동 중단되므로 실제로는 마지막 페이지에서 멈춤
+    // 최대 페이지 수 (안전장치)
     static final int MAX_PAGES = 200;
+
+    // 직무명 → 잡코리아 duty 코드 매핑
+    // 복수 코드(예: 데이터)는 쉼표로 구분
+    // 참고: 잡코리아는 DevOps 카테고리를 별도로 제공하지 않으므로 지원 직무에서 제외
+    static final Map<String, String> JOB_TYPE_DUTIES = Map.ofEntries(
+            Map.entry("백엔드", "1000229"),
+            Map.entry("프론트엔드", "1000230"),
+            Map.entry("풀스택", "1000231"),
+            Map.entry("모바일", "1000232"),
+            Map.entry("데이터", "1000236,1000237,1000418"),
+            Map.entry("AI/ML", "1000242,1000417")
+    );
 
     // 공고 제목에서 파싱할 기술스택 키워드 목록
     static final List<String> TECH_KEYWORDS = List.of(
@@ -74,47 +89,57 @@ public class JobkoreaCrawlerService implements CrawlerService {
     }
 
     /**
-     * 잡코리아 공고 수집 (빈 페이지가 나올 때까지 자동 반복)
-     *
-     * [페이지 이동 방식]
-     * - GET /recruit/joblist 는 SSR로 1페이지만 반환, Page 파라미터를 무시함
-     * - 페이지 이동은 POST /Recruit/Home/_GI_List/ + Page=N 으로만 가능
-     *
-     * [종료 조건]
-     * - crawlPage()가 -1 반환 → 해당 페이지에 공고가 없음 = 마지막 페이지 도달
-     * - crawlPage()가 0 반환 → 해당 페이지의 공고가 모두 DB에 이미 존재 = 중복 페이지
-     *   (이미 수집된 데이터만 있으므로 이후 페이지도 마찬가지일 가능성이 높아 중단)
-     * - MAX_PAGES 초과 → 무한 루프 방지용 안전장치
-     * - IOException → 네트워크 오류
+     * 직무별로 공고를 순회하며 전체 수집
      */
     @Override
     public void collect() {
-        log.info("[{}] 크롤링 시작 (마지막 페이지까지 자동 수집)", getSiteName());
+        log.info("[{}] 크롤링 시작 (직무별 카테고리 수집)", getSiteName());
+        int totalSaved = 0;
+
+        for (Map.Entry<String, String> entry : JOB_TYPE_DUTIES.entrySet()) {
+            totalSaved += collectByJobType(entry.getKey(), entry.getValue());
+        }
+
+        log.info("[{}] 크롤링 완료 - 총 {}개 저장", getSiteName(), totalSaved);
+    }
+
+    /**
+     * 특정 직무의 공고를 마지막 페이지까지 수집
+     *
+     * [종료 조건]
+     * - crawlPage()가 -1 반환 → 공고 없음 = 마지막 페이지 도달
+     * - crawlPage()가 0 반환 → 해당 페이지 공고가 모두 DB에 이미 존재 → 조기 종료
+     * - MAX_PAGES 초과 → 무한 루프 방지
+     *
+     * @param jobType  직무명 (예: "백엔드")
+     * @param duty     잡코리아 duty 파라미터 값 (예: "1000229")
+     */
+    private int collectByJobType(String jobType, String duty) {
+        log.info("[{}] {} 직무 수집 시작 (duty={})", getSiteName(), jobType, duty);
         int totalSaved = 0;
 
         for (int page = 1; page <= MAX_PAGES; page++) {
             try {
-                int saved = crawlPage(page);
+                int saved = crawlPage(page, duty, jobType);
 
-                // -1: 빈 페이지 = 마지막 페이지 도달 → 수집 종료
                 if (saved == -1) {
-                    log.info("[{}] {}페이지에서 공고 없음 → 수집 완료", getSiteName(), page);
+                    log.info("[{}] {} {}페이지에서 공고 없음 → 수집 완료", getSiteName(), jobType, page);
                     break;
                 }
 
-                // 0: 해당 페이지 공고가 모두 DB에 이미 존재 → 더 이상 수집할 신규 공고 없음
+                // 0: 해당 페이지 공고가 모두 DB에 이미 존재 → 조기 종료
                 if (saved == 0) {
-                    log.info("[{}] {}페이지 모두 중복 → 수집 종료", getSiteName(), page);
+                    log.info("[{}] {} {}페이지 모두 중복 → 수집 종료", getSiteName(), jobType, page);
                     break;
                 }
 
                 totalSaved += saved;
-                log.info("[{}] {}페이지 완료 - {}개 저장", getSiteName(), page, saved);
+                log.info("[{}] {} {}페이지 완료 - {}개 저장", getSiteName(), jobType, page, saved);
 
                 // 서버 부하 방지: 페이지 간 1초 대기
                 Thread.sleep(1000);
             } catch (IOException e) {
-                log.error("[{}] {}페이지 요청 실패: {}", getSiteName(), page, e.getMessage());
+                log.error("[{}] {} {}페이지 요청 실패: {}", getSiteName(), jobType, page, e.getMessage());
                 break;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -122,32 +147,31 @@ public class JobkoreaCrawlerService implements CrawlerService {
             }
         }
 
-        log.info("[{}] 크롤링 완료 - 총 {}개 저장", getSiteName(), totalSaved);
+        return totalSaved;
     }
 
     /**
-     * 특정 페이지에서 공고 목록 파싱 후 저장
+     * 특정 직무의 특정 페이지에서 공고 목록 파싱 후 저장
      *
      * GET 방식은 항상 1페이지만 반환하므로, AJAX 엔드포인트(POST)를 직접 호출함.
      * - POST_URL: /Recruit/Home/_GI_List/
      * - Body: menucode=duty&duty=...&Page=N
-     * - X-Requested-With: XMLHttpRequest → AJAX 요청임을 서버에 알림 (없으면 차단될 수 있음)
+     * - X-Requested-With: XMLHttpRequest → AJAX 요청임을 서버에 알림
      *
-     * @return 저장된 공고 수 (공고가 없는 마지막 페이지면 -1)
+     * @param page     페이지 번호
+     * @param duty     잡코리아 duty 파라미터 값
+     * @param jobType  직무명 (Job.jobType 필드에 저장)
+     * @return 저장된 공고 수 (-1: 마지막 페이지, 0: 모두 중복)
      */
-    private int crawlPage(int page) throws IOException {
-        // Jsoup.connect().post() 대신 data() + post() 조합 사용
-        // - .data(key, value): application/x-www-form-urlencoded 형식으로 body 전송
-        // - Jsoup은 POST body를 key=value 쌍으로만 설정 가능하므로 requestBody() 대신 data() 사용
+    private int crawlPage(int page, String duty, String jobType) throws IOException {
         Document doc = Jsoup.connect(POST_URL)
                 .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                         + "AppleWebKit/537.36 (KHTML, like Gecko) "
                         + "Chrome/124.0.0.0 Safari/537.36")
                 .header("Accept-Language", "ko-KR,ko;q=0.9")
-                // AJAX 요청임을 서버에 알리는 헤더 (없으면 일반 페이지 HTML을 반환할 수 있음)
                 .header("X-Requested-With", "XMLHttpRequest")
                 .data("menucode", "duty")
-                .data("duty", "1000229,1000230,1000231")
+                .data("duty", duty)
                 .data("Page", String.valueOf(page))
                 .maxBodySize(0)
                 .timeout(10_000)
@@ -163,7 +187,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
 
         int savedCount = 0;
         for (Element item : items) {
-            if (parseAndSave(item)) {
+            if (parseAndSave(item, jobType)) {
                 savedCount++;
             }
         }
@@ -173,10 +197,11 @@ public class JobkoreaCrawlerService implements CrawlerService {
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
+     * @param item    tr.devloopArea 엘리먼트
+     * @param jobType 직무명 (Job 엔티티에 저장)
      * @return true: 저장됨 / false: 중복으로 스킵
      */
-    private boolean parseAndSave(Element item) {
-        // 공고 제목과 URL 추출
+    private boolean parseAndSave(Element item, String jobType) {
         Element titleEl = item.selectFirst("td.tplTit strong a");
         if (titleEl == null) return false;
 
@@ -185,7 +210,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // 쿼리 파라미터 제거하여 고정 URL 사용 (중복 저장 방지)
         String sourceUrl = BASE_URL + titleEl.attr("href").replaceAll("\\?.*", "");
 
-        // 회사명
         Element corpEl = item.selectFirst("td.tplCo a.link");
         String company = (corpEl != null) ? corpEl.text().trim() : "미기재";
 
@@ -194,11 +218,18 @@ public class JobkoreaCrawlerService implements CrawlerService {
         String experience = cells.size() > 0 ? cells.get(0).text().trim() : "";
         String location   = cells.size() > 2 ? cells.get(2).text().trim() : "";
 
-        // 마감일 (예: "~05/10(일)") — 사람인과 동일한 형식
         Element dateEl = item.selectFirst("td.odd span.date");
         String deadlineText = (dateEl != null) ? dateEl.text().trim() : "";
 
-        return saveJob(title, company, location, experience, deadlineText, sourceUrl);
+        // p.etc span.cell 순서: [경력, 학력, 지역, 고용형태, 연봉, 직급]
+        // 경력/학력/지역은 모든 공고의 필수 항목이므로 고용형태는 항상 index 3에 위치
+        String employmentType = (cells.size() > 3) ? cells.get(3).text().trim() : null;
+
+        // 게시일 파싱: "3시간 전 등록", "1일 전 등록" 등 상대적 표현
+        LocalDate listedAt = parseListedAt(item);
+
+        return saveJob(title, company, location, experience, deadlineText, sourceUrl,
+                jobType, listedAt, employmentType);
     }
 
     /**
@@ -207,7 +238,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
      * @return true: 저장됨 / false: 중복으로 스킵
      */
     boolean saveJob(String title, String company, String location,
-                    String experience, String deadlineText, String sourceUrl) {
+                    String experience, String deadlineText, String sourceUrl,
+                    String jobType, LocalDate listedAt, String employmentType) {
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
         }
@@ -220,14 +252,48 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 .company(company)
                 .location(location.isBlank() ? "미기재" : location)
                 .experienceLevel(experience)
+                .employmentType(employmentType)
                 .deadline(deadline)
                 .sourceUrl(sourceUrl)
                 .sourceSite(getSiteName())
+                .jobType(jobType)
+                .listedAt(listedAt)
                 .build();
 
         job.getTechStacks().addAll(techStacks);
         jobRepository.save(job);
         return true;
+    }
+
+    /**
+     * 게시일 파싱
+     * 잡코리아 형식: "3시간 전 등록", "1일 전 등록", "방금 전 등록"
+     * 상대적 시간 표현이므로 오늘 또는 N일 전으로 변환
+     */
+    LocalDate parseListedAt(Element item) {
+        Element timeEl = item.selectFirst("td.odd span.time");
+        if (timeEl == null) return null;
+
+        String text = timeEl.text().trim();
+
+        // "N시간 전" → 오늘 날짜 (같은 날 등록)
+        Matcher hourMatcher = Pattern.compile("(\\d+)시간 전").matcher(text);
+        if (hourMatcher.find()) {
+            return LocalDate.now();
+        }
+
+        // "N일 전" → N일 전 날짜
+        Matcher dayMatcher = Pattern.compile("(\\d+)일 전").matcher(text);
+        if (dayMatcher.find()) {
+            return LocalDate.now().minusDays(Integer.parseInt(dayMatcher.group(1)));
+        }
+
+        // "방금 전" 또는 "오늘" → 오늘 날짜
+        if (text.contains("방금") || text.contains("오늘")) {
+            return LocalDate.now();
+        }
+
+        return null;
     }
 
     /**
@@ -265,9 +331,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
      * 잡코리아는 Next.js RSC 앱으로, 실제 공고 HTML이 AWS S3 presigned URL로 제공됨.
      * 1단계: 상세 페이지 HTML에서 RSC payload 안의 S3 URL 추출
      * 2단계: S3 HTML 파일 직접 GET → body 텍스트 반환
-     *
-     * @param sourceUrl 저장된 공고 URL (https://www.jobkorea.co.kr/Recruit/GI_Read/{id})
-     * @return 공고 상세 텍스트 (파싱 실패 시 null)
      */
     public DescriptionResponse fetchDescription(String sourceUrl) {
         try {

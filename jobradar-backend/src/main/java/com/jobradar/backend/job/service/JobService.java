@@ -42,6 +42,7 @@ public class JobService {
                                     List<String> locations,
                                     List<String> experiences,
                                     List<String> techStacks,
+                                    List<String> jobTypes,
                                     Pageable pageable) {
         // ACTIVE 조건은 항상 포함
         Specification<Job> spec = JobSpecification.isActive();
@@ -58,6 +59,10 @@ public class JobService {
         if (!CollectionUtils.isEmpty(techStacks)) {
             // techStack JOIN 시 중복 row 발생 → distinct 필요
             spec = spec.and(JobSpecification.hasTechStack(techStacks));
+        }
+        // 직무 필터: jobType IN ('백엔드', '풀스택') — 카테고리 코드 기반 정확한 필터링
+        if (!CollectionUtils.isEmpty(jobTypes)) {
+            spec = spec.and(JobSpecification.hasJobType(jobTypes));
         }
 
         return jobRepository.findAll(spec, pageable).map(JobResponse::from);
