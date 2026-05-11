@@ -53,8 +53,9 @@ const SignupPage = () => {
       await signup(email, password, nickname);
       // 성공 시 완료 화면으로 전환 (페이지 이동 아닌 조건부 렌더링)
       setIsSuccess(true);
-    } catch {
-      setError("이미 사용 중인 이메일입니다.");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setError(axiosErr.response?.data?.message ?? "");
     }
   };
 
