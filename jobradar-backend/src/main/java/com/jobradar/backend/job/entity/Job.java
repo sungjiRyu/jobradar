@@ -159,8 +159,9 @@ public class Job {
     // 크롤러가 description을 eager fetch한 결과를 기록
     // null은 "아직 fetch 안 됨"(기존 데이터)을 의미하므로 enum 값으로 두지 않음
     public enum DescriptionStatus {
-        SUCCESS,  // 텍스트 정상 수집
-        IMAGE,    // 이미지 공고 (텍스트 없음)
-        FAILED    // 외부 사이트 fetch 실패 (재시도 안 함)
+        SUCCESS,   // 텍스트 정상 수집
+        IMAGE,     // 이미지 공고 (텍스트 없음)
+        FAILED,    // 외부 사이트 fetch 실패 (재시도 안 함)
+        EXTERNAL   // 알바몬·고용24 등 외부 사이트 공고 (잡코리아에서 description 제공 안 함)
     }
 }

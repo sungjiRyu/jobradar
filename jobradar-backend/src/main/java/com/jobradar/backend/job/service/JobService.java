@@ -93,9 +93,10 @@ public class JobService {
         Job.DescriptionStatus status = job.getDescriptionStatus();
         if (status != null) {
             return switch (status) {
-                case SUCCESS -> DescriptionResponse.success(job.getDescription());
-                case IMAGE   -> DescriptionResponse.image();
-                case FAILED  -> DescriptionResponse.crawlFailed();
+                case SUCCESS  -> DescriptionResponse.success(job.getDescription());
+                case IMAGE    -> DescriptionResponse.image();
+                case FAILED   -> DescriptionResponse.crawlFailed();
+                case EXTERNAL -> DescriptionResponse.external();
             };
         }
 
@@ -123,9 +124,10 @@ public class JobService {
     /** DescriptionResponse.status(문자열) → Job.DescriptionStatus enum 변환 */
     private Job.DescriptionStatus mapStatus(String responseStatus) {
         return switch (responseStatus) {
-            case "SUCCESS" -> Job.DescriptionStatus.SUCCESS;
-            case "IMAGE"   -> Job.DescriptionStatus.IMAGE;
-            default        -> Job.DescriptionStatus.FAILED; // CRAWL_FAILED 포함
+            case "SUCCESS"  -> Job.DescriptionStatus.SUCCESS;
+            case "IMAGE"    -> Job.DescriptionStatus.IMAGE;
+            case "EXTERNAL" -> Job.DescriptionStatus.EXTERNAL;
+            default         -> Job.DescriptionStatus.FAILED; // CRAWL_FAILED 포함
         };
     }
 
@@ -229,8 +231,9 @@ public class JobService {
             log.info("[JobService] lazy fetch 완료 (summary용): jobId={}, status={}", jobId, status);
         }
 
-        if (status == Job.DescriptionStatus.IMAGE)  return SummaryResponse.imageOnly();
-        if (status == Job.DescriptionStatus.FAILED) return SummaryResponse.aiFailed();
+        if (status == Job.DescriptionStatus.IMAGE)    return SummaryResponse.imageOnly();
+        if (status == Job.DescriptionStatus.FAILED)   return SummaryResponse.aiFailed();
+        if (status == Job.DescriptionStatus.EXTERNAL) return SummaryResponse.aiFailed();
 
         // SUCCESS → AI 요약
         try {
