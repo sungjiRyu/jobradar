@@ -40,7 +40,7 @@ public class CrawlerScheduler {
      *
      * [주의] @EnableScheduling이 main 클래스에 있어야 동작함
      */
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
     public void runCrawling() {
         log.info("===== 채용공고 수집 스케줄러 시작 =====");
 
