@@ -257,10 +257,12 @@ const MyPage = () => {
                       return (
                         <li
                           key={scrap.scrapId}
-                          className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between"
+                          className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => navigate(`/jobs/${scrap.jobPostId}`)}
                         >
-                          {/* 공고 정보 */}
-                          <div className="flex flex-col gap-1">
+                          <div
+                            className="flex flex-col gap-1"
+                          >
                             <p className="text-[14px] font-medium">{scrap.title}</p>
                             <p className="text-[12px] text-[#888780]">{scrap.company}</p>
                             {/* D-day: 3일 이내면 빨간색 */}
@@ -276,9 +278,10 @@ const MyPage = () => {
                               {statusLabel[scrap.status]}
                             </span>
 
-                            {/* 상태 변경 드롭다운 */}
+                            {/* 상태 변경 드롭다운 — li onClick 버블링 차단 */}
                             <select
                               value={scrap.status}
+                              onClick={(e) => e.stopPropagation()}
                               onChange={(e) =>
                                 handleStatusChange(scrap.scrapId, e.target.value as ScrapStatus)
                               }
@@ -290,9 +293,9 @@ const MyPage = () => {
                               <option value="REJECTED">탈락</option>
                             </select>
 
-                            {/* 삭제 버튼 */}
+                            {/* 삭제 버튼 — li onClick 버블링 차단 */}
                             <button
-                              onClick={() => handleDelete(scrap.scrapId)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(scrap.scrapId); }}
                               className="text-[12px] text-[#A32D2D] border border-[#A32D2D] rounded-lg px-2 py-1 hover:bg-[#FCEBEB] transition-colors"
                             >
                               삭제
@@ -352,7 +355,8 @@ const MyPage = () => {
                     {filteredApply.map((scrap) => (
                       <li
                         key={scrap.scrapId}
-                        className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between"
+                        className="border border-[#DDDDDD] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => navigate(`/jobs/${scrap.jobPostId}`)}
                       >
                         <div className="flex flex-col gap-1">
                           <p className="text-[14px] font-medium">{scrap.title}</p>

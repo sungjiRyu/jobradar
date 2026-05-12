@@ -118,7 +118,7 @@ const JobListPage = () => {
             className={`rounded-[10px] border px-4 py-3 flex flex-col gap-0.5 cursor-pointer transition-all
               ${activeCard === item.card && item.card !== null
                 ? "bg-[#F0F7FF] border-[#378ADD] shadow-sm"
-                : "bg-white border-[#DDDDDD] hover:border-[#BBBBBB]"
+                : "bg-white border-[#DDDDDD]"
               }`}
           >
             <span className="text-[11px] text-[#888780]">{item.label}</span>
