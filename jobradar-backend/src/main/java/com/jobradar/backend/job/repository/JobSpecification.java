@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -77,6 +78,29 @@ public class JobSpecification {
      */
     public static Specification<Job> hasJobType(List<String> jobTypes) {
         return (root, query, cb) -> root.get("jobType").in(jobTypes);
+    }
+
+    /**
+     * 오늘 등록된 공고 (createdAt 날짜 기준)
+     * CAST(created_at AS DATE) = TODAY
+     */
+    public static Specification<Job> isCreatedToday() {
+        return (root, query, cb) -> {
+            LocalDate today = LocalDate.now();
+            return cb.equal(cb.function("DATE", LocalDate.class, root.get("createdAt")), today);
+        };
+    }
+
+    /**
+     * 마감 임박 공고 — 오늘부터 7일 이내 마감
+     * deadline BETWEEN today AND today+7
+     */
+    public static Specification<Job> isUrgent() {
+        return (root, query, cb) -> {
+            LocalDate today = LocalDate.now();
+            LocalDate limit = today.plusDays(7);
+            return cb.between(root.get("deadline"), today, limit);
+        };
     }
 
     /**

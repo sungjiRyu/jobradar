@@ -33,6 +33,7 @@ const JobListPage = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [currentFilter, setCurrentFilter] = useState<FilterState>(INITIAL_FILTER);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
+  const [activeCard, setActiveCard] = useState<"today" | "urgent" | "junior" | null>(null);
 
   // 페이지 변경 (Pagination은 0-based → URL은 1-based로 저장)
   const handlePageChange = (newPage: number) => {
@@ -41,9 +42,16 @@ const JobListPage = () => {
     setSearchParams(next);
   };
 
-  // 필터 변경 시 state 업데이트 + 페이지 1로 리셋
+  // 필터 변경 시 state 업데이트 + 페이지 1로 리셋 + 카드 선택 해제
   const handleFilterChange = (filter: FilterState) => {
     setCurrentFilter(filter);
+    setActiveCard(null);
+    setSearchParams(new URLSearchParams({ page: "1" }));
+  };
+
+  // 현황 카드 클릭 — 같은 카드 재클릭 시 해제
+  const handleCardClick = (card: "today" | "urgent" | "junior") => {
+    setActiveCard(prev => prev === card ? null : card);
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
 
@@ -61,17 +69,19 @@ const JobListPage = () => {
       setError("");
 
       try {
-        const params: Record<string, string | number | string[]> = { page, size: 10 };
+        const params: Record<string, string | number | string[] | boolean> = { page, size: 10 };
 
-        // 키워드는 제목/회사명 검색, 직무(job)는 jobType 파라미터로 별도 전달
         if (currentFilter.keyword) params.keyword = currentFilter.keyword;
         if (currentFilter.job) params.jobType = currentFilter.job;
-
-        // location, experienceLevel, techStack: 배열로 전달 → axios가 ?location=서울&location=경기 형태로 직렬화
         if (currentFilter.locations.length > 0) params.location = currentFilter.locations;
         if (currentFilter.experiences.length > 0) params.experienceLevel = currentFilter.experiences;
         if (currentFilter.techStacks.length > 0) params.techStack = currentFilter.techStacks;
         if (currentFilter.sort) params.sort = currentFilter.sort;
+
+        // 현황 카드 필터
+        if (activeCard === "today")  params.todayOnly = true;
+        if (activeCard === "urgent") params.urgentOnly = true;
+        if (activeCard === "junior") params.experienceLevel = ["신입"];
 
         const res = await getJobs(params);
         setJobs(res.data.data.content);
@@ -85,7 +95,7 @@ const JobListPage = () => {
     };
 
     fetchJobs();
-  }, [currentFilter, page]);
+  }, [currentFilter, page, activeCard]);
 
   return (
     <div className="max-w-[1100px] mx-auto px-6 py-6">
@@ -97,12 +107,20 @@ const JobListPage = () => {
       {/* 오늘의 현황 카드 */}
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
-          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]" },
-          { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]" },
-          { label: "마감 임박", value: todayStats?.urgentCount, color: "text-[#E24B4A]" },
-          { label: "신입 공고", value: todayStats?.juniorCount, color: "text-[#1D9E75]" },
+          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]", card: null },
+          { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]", card: "today" as const },
+          { label: "마감 임박", value: todayStats?.urgentCount, color: "text-[#E24B4A]", card: "urgent" as const },
+          { label: "신입 공고", value: todayStats?.juniorCount, color: "text-[#1D9E75]", card: "junior" as const },
         ].map(item => (
-          <div key={item.label} className="bg-white rounded-[10px] border border-[#DDDDDD] px-4 py-3 flex flex-col gap-0.5">
+          <div
+            key={item.label}
+            onClick={() => item.card ? handleCardClick(item.card) : handleFilterChange({ ...INITIAL_FILTER })}
+            className={`rounded-[10px] border px-4 py-3 flex flex-col gap-0.5 cursor-pointer transition-all
+              ${activeCard === item.card && item.card !== null
+                ? "bg-[#F0F7FF] border-[#378ADD] shadow-sm"
+                : "bg-white border-[#DDDDDD] hover:border-[#BBBBBB]"
+              }`}
+          >
             <span className="text-[11px] text-[#888780]">{item.label}</span>
             <span className={`text-[20px] font-bold ${item.color}`}>
               {item.value != null ? item.value.toLocaleString() : "-"}
