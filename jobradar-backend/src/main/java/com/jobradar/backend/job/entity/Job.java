@@ -29,7 +29,16 @@ public class Job {
     private String title;         // 공고 제목
 
     @Column(columnDefinition = "TEXT")
-    private String description;   // 공고 상세 내용 (사람인 view-detail 크롤링)
+    private String description;   // 공고 상세 내용 (크롤링 시 함께 수집)
+
+    // description 수집 결과 상태 (크롤링 시 eager fetch 결과를 기록)
+    // null  - 아직 fetch 안 됨 (기존 데이터, 백필 대상)
+    // SUCCESS - 정상 수집 완료
+    // IMAGE   - 이미지 공고로 텍스트 없음
+    // FAILED  - 외부 사이트 fetch 실패 (재시도 안 함)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private DescriptionStatus descriptionStatus;
 
     @Column(columnDefinition = "TEXT")
     private String summary;       // AI 요약 (Gemini API, 최초 조회 시 생성)
@@ -99,7 +108,8 @@ public class Job {
     public Job(String company, String title, String description, String location,
                String experienceLevel, String employmentType,
                LocalDate deadline, String sourceUrl, String sourceSite,
-               String jobType, LocalDate listedAt) {
+               String jobType, LocalDate listedAt,
+               DescriptionStatus descriptionStatus) {
         this.company = company;
         this.title = title;
         this.description = description;
@@ -111,6 +121,7 @@ public class Job {
         this.sourceSite = sourceSite;
         this.jobType = jobType;
         this.listedAt = listedAt;
+        this.descriptionStatus = descriptionStatus;
         this.status = JobStatus.ACTIVE;
         this.viewCount = 0;
     }
@@ -127,9 +138,10 @@ public class Job {
         this.status = JobStatus.CLOSED;
     }
 
-    /** 상세 내용 저장 — 최초 상세 조회 시 크롤링 결과를 저장 */
-    public void updateDescription(String description) {
+    /** 상세 내용 + 수집 상태 저장 — 백필 또는 lazy fetch 시 사용 */
+    public void updateDescription(String description, DescriptionStatus descriptionStatus) {
         this.description = description;
+        this.descriptionStatus = descriptionStatus;
     }
 
     /** AI 요약 저장 — 최초 상세 조회 시 Gemini API 결과를 저장 */
@@ -141,5 +153,14 @@ public class Job {
     public enum JobStatus {
         ACTIVE,  // 진행 중
         CLOSED   // 마감
+    }
+
+    // ===== description 수집 결과 상태 Enum =====
+    // 크롤러가 description을 eager fetch한 결과를 기록
+    // null은 "아직 fetch 안 됨"(기존 데이터)을 의미하므로 enum 값으로 두지 않음
+    public enum DescriptionStatus {
+        SUCCESS,  // 텍스트 정상 수집
+        IMAGE,    // 이미지 공고 (텍스트 없음)
+        FAILED    // 외부 사이트 fetch 실패 (재시도 안 함)
     }
 }

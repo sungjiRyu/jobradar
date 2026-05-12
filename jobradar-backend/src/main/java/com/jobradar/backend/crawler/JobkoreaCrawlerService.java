@@ -93,6 +93,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
      */
     @Override
     public void collect() {
+        long startMs = System.currentTimeMillis();
         log.info("[{}] 크롤링 시작 (직무별 카테고리 수집)", getSiteName());
         int totalSaved = 0;
 
@@ -100,7 +101,10 @@ public class JobkoreaCrawlerService implements CrawlerService {
             totalSaved += collectByJobType(entry.getKey(), entry.getValue());
         }
 
-        log.info("[{}] 크롤링 완료 - 총 {}개 저장", getSiteName(), totalSaved);
+        // 소요시간 출력 — 잡코리아는 description fetch가 2-step(main + S3)이라 더 무거움
+        long elapsedSec = (System.currentTimeMillis() - startMs) / 1000;
+        log.info("[{}] 크롤링 완료 - 총 {}개 저장 (소요시간: {}분 {}초)",
+                getSiteName(), totalSaved, elapsedSec / 60, elapsedSec % 60);
     }
 
     /**
@@ -197,6 +201,9 @@ public class JobkoreaCrawlerService implements CrawlerService {
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
+     * Eager description fetch: sourceUrl 확보 직후 상세 페이지 fetch.
+     * 잡코리아는 2-step(main page → S3) 이라 사람인보다 1~2배 무거움.
+     *
      * @param item    tr.devloopArea 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)
      * @return true: 저장됨 / false: 중복으로 스킵
@@ -209,6 +216,11 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // href 예시: /Recruit/GI_Read/48998248?rPageCode=PL&...
         // 쿼리 파라미터 제거하여 고정 URL 사용 (중복 저장 방지)
         String sourceUrl = BASE_URL + titleEl.attr("href").replaceAll("\\?.*", "");
+
+        // 중복 체크 먼저 — 이미 있으면 무거운 description fetch 자체를 스킵
+        if (jobRepository.existsBySourceUrl(sourceUrl)) {
+            return false;
+        }
 
         Element corpEl = item.selectFirst("td.tplCo a.link");
         String company = (corpEl != null) ? corpEl.text().trim() : "미기재";
@@ -228,8 +240,16 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // 게시일 파싱: "3시간 전 등록", "1일 전 등록" 등 상대적 표현
         LocalDate listedAt = parseListedAt(item);
 
+        // Eager fetch — 외부 사이트 부하를 막기 위해 호출 후 짧은 sleep
+        DescriptionResponse descResponse = fetchDescription(sourceUrl);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         return saveJob(title, company, location, experience, deadlineText, sourceUrl,
-                jobType, listedAt, employmentType);
+                jobType, listedAt, employmentType, descResponse);
     }
 
     /**
@@ -239,13 +259,21 @@ public class JobkoreaCrawlerService implements CrawlerService {
      */
     boolean saveJob(String title, String company, String location,
                     String experience, String deadlineText, String sourceUrl,
-                    String jobType, LocalDate listedAt, String employmentType) {
+                    String jobType, LocalDate listedAt, String employmentType,
+                    DescriptionResponse descResponse) {
+        // 중복 체크는 parseAndSave에서 이미 수행했으나, 단위 테스트가 saveJob을 직접 호출하므로 안전망
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
         }
 
         LocalDate deadline = parseDeadline(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
+
+        // DescriptionResponse → Job.DescriptionStatus 매핑
+        Job.DescriptionStatus descriptionStatus = SaraminCrawlerService.mapDescriptionStatus(descResponse);
+        String description = "SUCCESS".equals(descResponse.getStatus())
+                ? descResponse.getDescription()
+                : null;
 
         Job job = Job.builder()
                 .title(title)
@@ -258,6 +286,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 .sourceSite(getSiteName())
                 .jobType(jobType)
                 .listedAt(listedAt)
+                .description(description)
+                .descriptionStatus(descriptionStatus)
                 .build();
 
         job.getTechStacks().addAll(techStacks);

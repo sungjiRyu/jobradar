@@ -1,5 +1,6 @@
 package com.jobradar.backend.crawler;
 
+import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.job.repository.JobRepository;
@@ -46,7 +47,8 @@ class JobkoreaCrawlerServiceTest {
         boolean saved = jobkoreaCrawlerService.saveJob(
                 "Java 백엔드 개발자", "테스트회사", "서울", "신입",
                 "~05/10(일)", "https://www.jobkorea.co.kr/Recruit/GI_Read/12345",
-                "백엔드", null, "정규직"
+                "백엔드", null, "정규직",
+                DescriptionResponse.success("Java 백엔드 채용 본문")
         );
 
         // then
@@ -66,7 +68,8 @@ class JobkoreaCrawlerServiceTest {
         boolean saved = jobkoreaCrawlerService.saveJob(
                 "React 프론트엔드 개발자", "새회사", "서울 강남구", "경력 2년",
                 "~05/31(토)", "https://www.jobkorea.co.kr/Recruit/GI_Read/99999",
-                "프론트엔드", null, "정규직"
+                "프론트엔드", null, "정규직",
+                DescriptionResponse.success("React 프론트엔드 채용 본문")
         );
 
         // then

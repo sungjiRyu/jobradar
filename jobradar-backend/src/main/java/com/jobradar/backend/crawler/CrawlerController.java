@@ -1,5 +1,6 @@
 package com.jobradar.backend.crawler;
 
+import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,10 +25,11 @@ import java.util.List;
 public class CrawlerController {
 
     private final List<CrawlerService> crawlerServices;
+    private final JobService jobService;
 
     /**
      * POST /api/admin/crawl
-     * 모든 크롤러를 즉시 실행
+     * 모든 크롤러를 즉시 실행 후 마감 공고를 일괄 CLOSED 처리
      *
      * [인증 필요]
      * SecurityConfig에서 /api/admin/** → authenticated() 설정
@@ -47,6 +49,29 @@ public class CrawlerController {
             }
         }
 
+        // 크롤링 완료 후 마감일 지난 공고 일괄 CLOSED 처리
+        try {
+            jobService.closeExpiredJobs();
+        } catch (Exception e) {
+            log.error("마감 공고 정리 중 오류 발생", e);
+        }
+
         return ResponseEntity.ok("크롤링 완료");
+    }
+
+    /**
+     * POST /api/admin/backfill-descriptions
+     * description_status가 null인 기존 공고들을 일괄 fetch
+     *
+     * - @Async로 백그라운드 실행 → 즉시 202 Accepted 반환
+     * - 진행 상황은 서버 로그에서 확인 ([backfill] N/M 처리됨)
+     * - 외부 사이트 부하를 줄이기 위해 공고당 1초 sleep
+     */
+    @PostMapping("/backfill-descriptions")
+    public ResponseEntity<String> backfillDescriptions() {
+        log.info("description 백필 요청 수신");
+        jobService.backfillDescriptions();
+        return ResponseEntity.accepted()
+                .body("백필 작업이 백그라운드에서 시작되었습니다. 진행 상황은 서버 로그를 확인하세요.");
     }
 }

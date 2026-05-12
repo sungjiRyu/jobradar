@@ -5,8 +5,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 /**
  * 채용공고 레포지토리
@@ -42,4 +45,28 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
                      @Param("experienceLevel") String experienceLevel,
                      @Param("techStack") String techStack,
                      Pageable pageable);
+
+    /**
+     * description_status가 null인 공고 조회 (백필 대상)
+     * 기존 데이터 중 아직 description fetch 안 된 공고만 선별
+     */
+    List<Job> findByDescriptionStatusIsNull();
+
+    /**
+     * 마감일 지난 ACTIVE 공고를 일괄 CLOSED 처리
+     *
+     * - deadline < CURRENT_DATE: 마감일이 오늘보다 이전 (오늘 마감은 제외)
+     * - deadline IS NULL (상시 채용/채용시까지)인 공고는 자동으로 제외
+     *   ※ JPQL/SQL에서 NULL과의 비교 결과는 UNKNOWN → WHERE 조건에서 false 처리
+     * - @Modifying: SELECT가 아닌 UPDATE 쿼리임을 알림
+     *
+     * @return 영향 받은 행 수
+     */
+    @Modifying
+    @Query("UPDATE Job j " +
+           "SET j.status = com.jobradar.backend.job.entity.Job.JobStatus.CLOSED, " +
+           "    j.updatedAt = CURRENT_TIMESTAMP " +
+           "WHERE j.deadline < CURRENT_DATE " +
+           "  AND j.status = com.jobradar.backend.job.entity.Job.JobStatus.ACTIVE")
+    int closeExpiredJobs();
 }
