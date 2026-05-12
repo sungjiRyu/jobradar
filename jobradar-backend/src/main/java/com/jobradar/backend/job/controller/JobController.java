@@ -44,15 +44,9 @@ public class JobController {
             @RequestParam(name = "experienceLevel", required = false) List<String> experiences,
             @RequestParam(name = "techStack", required = false) List<String> techStacks,
             @RequestParam(name = "jobType", required = false) List<String> jobTypes,
-            @PageableDefault(size = 10, sort = "listedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-
-        // listedAt 정렬 시 NULL 공고를 맨 뒤로 배치 (null = listedAt 미파싱 공고)
-        // 기본 정렬(등록일순)이 listedAt이므로 항상 적용됨
-        boolean isListedAtSort = pageable.getSort().getOrderFor("listedAt") != null;
-        if (isListedAtSort) {
-            Sort sort = Sort.by(Sort.Order.desc("listedAt").nullsLast());
-            pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
-        }
+            @RequestParam(name = "todayOnly", required = false, defaultValue = "false") boolean todayOnly,
+            @RequestParam(name = "urgentOnly", required = false, defaultValue = "false") boolean urgentOnly,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         // deadline 정렬 요청 시 NULL 공고를 맨 뒤로 배치
         // MySQL은 ASC에서 NULL을 가장 앞에 놓기 때문에 별도 처리 필요
@@ -62,7 +56,7 @@ public class JobController {
             pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
         }
 
-        return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, jobTypes, pageable));
+        return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, jobTypes, todayOnly, urgentOnly, pageable));
     }
 
     /** GET /api/jobs/{id} — 공고 상세 조회 (DB 조회만, 즉시 응답) */

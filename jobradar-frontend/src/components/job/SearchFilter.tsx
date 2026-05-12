@@ -106,19 +106,21 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
     techStacks: "",
   });
 
-  // 컨테이너 외부 클릭 감지용 ref
-  const containerRef = useRef<HTMLDivElement>(null);
+  // 각 드롭다운 wrapper(버튼+패널) ref 맵 — 열린 드롭다운 바깥 클릭 감지용
+  const dropdownRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
-  // 컨테이너 외부 클릭 시 모든 패널 닫기
+  // openPanel이 바뀔 때마다 핸들러 재등록 → 항상 최신 openPanel 참조
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (!openPanel) return;
+      const el = dropdownRefs.current.get(openPanel);
+      if (el && !el.contains(e.target as Node)) {
         setOpenPanel(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [openPanel]);
 
   // 필터 변경 시마다 부모에게 알림
   useEffect(() => {
@@ -205,7 +207,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
   // ─────────────────────────────────────────────
 
   return (
-    <div ref={containerRef} className="bg-white rounded-[12px] border border-[#DDDDDD] p-5">
+    <div className="bg-white rounded-[12px] border border-[#DDDDDD] p-5">
 
       {/* ── 검색바 ── */}
       <div className="flex gap-2 mb-4">
@@ -249,7 +251,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
           const isOpen = openPanel === key;
 
           return (
-            <div key={key} className="relative">
+            <div key={key} className="relative" ref={el => { dropdownRefs.current.set(key, el); }}>
               {/* 드롭다운 버튼 */}
               <button
                 onClick={() => togglePanel(key)}
