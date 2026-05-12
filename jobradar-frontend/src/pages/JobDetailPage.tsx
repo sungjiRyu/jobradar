@@ -12,7 +12,7 @@ interface JobDetail {
   company: string;
   title: string;
   description: string | null;
-  descriptionStatus: "SUCCESS" | "IMAGE" | "FAILED" | null; // 크롤링 결과 상태
+  descriptionStatus: "SUCCESS" | "IMAGE" | "FAILED" | "EXTERNAL" | null; // 크롤링 결과 상태
   summary: string | null;     // AI가 정리한 JSON 문자열 (없으면 null)
   location: string;
   experienceLevel: string;
@@ -79,7 +79,7 @@ const JobDetailPage = () => {
   // ── AI 요약 상태 ─────────────────────────────
   const [summary, setSummary] = useState<string | undefined>(undefined);
   // undefined = 로딩 중, string = 완료, (summaryFailReason로 실패 구분)
-  const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | "crawlerFailed" | undefined>(undefined);
+  const [summaryFailReason, setSummaryFailReason] = useState<"imageOnly" | "aiFailed" | "crawlerFailed" | "external" | undefined>(undefined);
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null); // 로딩 메시지 전환용
 
   // ── 점(dots) 애니메이션 ───────────────────────
@@ -160,13 +160,17 @@ const JobDetailPage = () => {
           return;
         }
 
-        // IMAGE/FAILED는 이미 상태 확정 → API 호출 없이 즉시 메시지 표시
+        // IMAGE/FAILED/EXTERNAL은 이미 상태 확정 → API 호출 없이 즉시 메시지 표시
         if (jobData.descriptionStatus === "IMAGE") {
           setSummaryFailReason("imageOnly");
           return;
         }
         if (jobData.descriptionStatus === "FAILED") {
           setSummaryFailReason("crawlerFailed");
+          return;
+        }
+        if (jobData.descriptionStatus === "EXTERNAL") {
+          setSummaryFailReason("external");
           return;
         }
 
@@ -317,6 +321,21 @@ const JobDetailPage = () => {
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-1">공고 정보를 가져오는데 실패했습니다.</p>
           <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
+        </div>
+      )}
+
+      {/* 4) 외부 공고: 알바몬·고용24 등 외부 사이트 공고 → 원본 링크 버튼 */}
+      {summaryFailReason === "external" && (
+        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
+          <p className="text-[13px] text-[#888780] mb-3">이 공고는 외부 사이트에서 확인할 수 있습니다.</p>
+          <a
+            href={job?.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-[#378ADD] text-white text-[13px] font-medium px-5 py-2 rounded-lg hover:bg-[#2B6CB0] transition-colors"
+          >
+            원본 공고 바로가기
+          </a>
         </div>
       )}
 

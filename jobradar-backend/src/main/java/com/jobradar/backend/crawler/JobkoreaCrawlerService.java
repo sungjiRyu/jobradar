@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -140,8 +141,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 totalSaved += saved;
                 log.info("[{}] {} {}페이지 완료 - {}개 저장", getSiteName(), jobType, page, saved);
 
-                // 서버 부하 방지: 페이지 간 1초 대기
-                Thread.sleep(1000);
+                // 서버 부하 방지: 페이지 간 2~4초 랜덤 대기 (규칙적 패턴 회피)
+                Thread.sleep(ThreadLocalRandom.current().nextLong(2000, 4000));
             } catch (IOException e) {
                 log.error("[{}] {} {}페이지 요청 실패: {}", getSiteName(), jobType, page, e.getMessage());
                 break;
@@ -214,10 +215,12 @@ public class JobkoreaCrawlerService implements CrawlerService {
 
         String title = titleEl.text().trim();
         // href 예시: /Recruit/GI_Read/48998248?rPageCode=PL&...
-        // 쿼리 파라미터 제거하여 고정 URL 사용 (중복 저장 방지)
-        String sourceUrl = BASE_URL + titleEl.attr("href").replaceAll("\\?.*", "");
+        // 알바몬 등 외부 광고는 절대 URL, /Ext는 고용24 임베드 공고 → EXTERNAL 상태로 저장
+        String href = titleEl.attr("href").replaceAll("\\?.*", "");
+        boolean isExternal = !href.startsWith("/") || href.endsWith("/Ext");
+        String sourceUrl = href.startsWith("/") ? BASE_URL + href : href;
 
-        // 중복 체크 먼저 — 이미 있으면 무거운 description fetch 자체를 스킵
+        // 중복 체크 먼저 — 이미 있으면 스킵
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
         }
@@ -240,16 +243,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // 게시일 파싱: "3시간 전 등록", "1일 전 등록" 등 상대적 표현
         LocalDate listedAt = parseListedAt(item);
 
-        // Eager fetch — 외부 사이트 부하를 막기 위해 호출 후 짧은 sleep
-        DescriptionResponse descResponse = fetchDescription(sourceUrl);
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
         return saveJob(title, company, location, experience, deadlineText, sourceUrl,
-                jobType, listedAt, employmentType, descResponse);
+                jobType, listedAt, employmentType, isExternal);
     }
 
     /**
@@ -260,7 +255,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
     boolean saveJob(String title, String company, String location,
                     String experience, String deadlineText, String sourceUrl,
                     String jobType, LocalDate listedAt, String employmentType,
-                    DescriptionResponse descResponse) {
+                    boolean isExternal) {
         // 중복 체크는 parseAndSave에서 이미 수행했으나, 단위 테스트가 saveJob을 직접 호출하므로 안전망
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
@@ -269,11 +264,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
         LocalDate deadline = parseDeadline(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
 
-        // DescriptionResponse → Job.DescriptionStatus 매핑
-        Job.DescriptionStatus descriptionStatus = SaraminCrawlerService.mapDescriptionStatus(descResponse);
-        String description = "SUCCESS".equals(descResponse.getStatus())
-                ? descResponse.getDescription()
-                : null;
+        // 외부 공고(알바몬/고용24)는 EXTERNAL 상태로 저장, 일반 공고는 null (lazy fetch 대상)
+        Job.DescriptionStatus descriptionStatus = isExternal ? Job.DescriptionStatus.EXTERNAL : null;
 
         Job job = Job.builder()
                 .title(title)
@@ -286,7 +278,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 .sourceSite(getSiteName())
                 .jobType(jobType)
                 .listedAt(listedAt)
-                .description(description)
                 .descriptionStatus(descriptionStatus)
                 .build();
 

@@ -32,4 +32,8 @@ public class DescriptionResponse {
     public static DescriptionResponse crawlFailed() {
         return new DescriptionResponse("CRAWL_FAILED", null);
     }
+
+    public static DescriptionResponse external() {
+        return new DescriptionResponse("EXTERNAL", null);
+    }
 }

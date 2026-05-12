@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -142,8 +143,8 @@ public class SaraminCrawlerService implements CrawlerService {
                 totalSaved += saved;
                 log.info("[{}] {} {}페이지 완료 - {}개 저장", getSiteName(), jobType, page, saved);
 
-                // 서버 부하 방지: 페이지 간 1초 대기
-                Thread.sleep(1000);
+                // 서버 부하 방지: 페이지 간 2~4초 랜덤 대기 (규칙적 패턴 회피)
+                Thread.sleep(ThreadLocalRandom.current().nextLong(2000, 4000));
             } catch (IOException e) {
                 log.error("[{}] {} {}페이지 요청 실패: {}", getSiteName(), jobType, page, e.getMessage());
                 break;
@@ -231,16 +232,8 @@ public class SaraminCrawlerService implements CrawlerService {
 
         LocalDate listedAt = parseListedAt(item);
 
-        // Eager fetch — 외부 사이트 부하를 막기 위해 호출 후 짧은 sleep
-        DescriptionResponse descResponse = fetchDescription(sourceUrl);
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
         return saveJob(title, company, location, experience, deadlineText, sourceUrl,
-                jobType, listedAt, employmentType, descResponse);
+                jobType, listedAt, employmentType);
     }
 
     /**
@@ -250,8 +243,7 @@ public class SaraminCrawlerService implements CrawlerService {
      */
     boolean saveJob(String title, String company, String location,
                     String experience, String deadlineText, String sourceUrl,
-                    String jobType, LocalDate listedAt, String employmentType,
-                    DescriptionResponse descResponse) {
+                    String jobType, LocalDate listedAt, String employmentType) {
         // 중복 체크는 parseAndSave에서 이미 수행했으나, 단위 테스트가 saveJob을 직접 호출하므로 안전망으로 한 번 더 검사
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
@@ -259,13 +251,6 @@ public class SaraminCrawlerService implements CrawlerService {
 
         LocalDate deadline = parseDeadline(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
-
-        // DescriptionResponse → Job.DescriptionStatus 매핑 및 description 텍스트 추출
-        // SUCCESS만 description 본문 저장, IMAGE/FAILED는 null
-        Job.DescriptionStatus descriptionStatus = mapDescriptionStatus(descResponse);
-        String description = "SUCCESS".equals(descResponse.getStatus())
-                ? descResponse.getDescription()
-                : null;
 
         Job job = Job.builder()
                 .title(title)
@@ -278,22 +263,11 @@ public class SaraminCrawlerService implements CrawlerService {
                 .sourceSite(getSiteName())
                 .jobType(jobType)
                 .listedAt(listedAt)
-                .description(description)
-                .descriptionStatus(descriptionStatus)
                 .build();
 
         job.getTechStacks().addAll(techStacks);
         jobRepository.save(job);
         return true;
-    }
-
-    /** DescriptionResponse.status(문자열) → Job.DescriptionStatus enum */
-    static Job.DescriptionStatus mapDescriptionStatus(DescriptionResponse resp) {
-        return switch (resp.getStatus()) {
-            case "SUCCESS" -> Job.DescriptionStatus.SUCCESS;
-            case "IMAGE"   -> Job.DescriptionStatus.IMAGE;
-            default        -> Job.DescriptionStatus.FAILED; // CRAWL_FAILED 포함
-        };
     }
 
     /**
