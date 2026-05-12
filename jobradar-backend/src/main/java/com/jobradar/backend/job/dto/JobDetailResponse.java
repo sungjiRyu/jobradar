@@ -15,7 +15,7 @@ public class JobDetailResponse {
     private final String company;
     private final String title;
     private final String description;
-    private final String descriptionStatus; // SUCCESS / IMAGE / FAILED / null(기존 데이터)
+    private final String descriptionStatus; // SUCCESS / IMAGE / EXTERNAL / null(미fetch 또는 크롤링 실패)
     private final String summary;       // AI 요약 (null이면 미생성)
     private final String location;
     private final String experienceLevel;

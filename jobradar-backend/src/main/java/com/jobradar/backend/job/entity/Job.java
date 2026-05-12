@@ -31,11 +31,11 @@ public class Job {
     @Column(columnDefinition = "TEXT")
     private String description;   // 공고 상세 내용 (크롤링 시 함께 수집)
 
-    // description 수집 결과 상태 (크롤링 시 eager fetch 결과를 기록)
-    // null  - 아직 fetch 안 됨 (기존 데이터, 백필 대상)
-    // SUCCESS - 정상 수집 완료
-    // IMAGE   - 이미지 공고로 텍스트 없음
-    // FAILED  - 외부 사이트 fetch 실패 (재시도 안 함)
+    // description 수집 결과 상태
+    // null     - 아직 fetch 안 됨, 또는 크롤링 실패(다음 방문 시 재시도)
+    // SUCCESS  - 텍스트 정상 수집
+    // IMAGE    - 이미지 공고로 텍스트 없음
+    // EXTERNAL - 외부 사이트 공고 (알바몬·고용24)
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private DescriptionStatus descriptionStatus;
@@ -156,12 +156,11 @@ public class Job {
     }
 
     // ===== description 수집 결과 상태 Enum =====
-    // 크롤러가 description을 eager fetch한 결과를 기록
-    // null은 "아직 fetch 안 됨"(기존 데이터)을 의미하므로 enum 값으로 두지 않음
+    // null = "아직 fetch 안 됨" 또는 "크롤링 실패(재시도 대상)" — enum으로 두지 않음
     public enum DescriptionStatus {
         SUCCESS,   // 텍스트 정상 수집
         IMAGE,     // 이미지 공고 (텍스트 없음)
-        FAILED,    // 외부 사이트 fetch 실패 (재시도 안 함)
-        EXTERNAL   // 알바몬·고용24 등 외부 사이트 공고 (잡코리아에서 description 제공 안 함)
+        EXTERNAL   // 알바몬·고용24 등 외부 사이트 공고
+        // FAILED 없음: 크롤링 실패 시 null 유지 → 다음 방문 시 자동 재시도
     }
 }
