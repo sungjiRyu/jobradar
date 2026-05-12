@@ -94,6 +94,7 @@ public class SaraminCrawlerService implements CrawlerService {
      */
     @Override
     public void collect() {
+        long startMs = System.currentTimeMillis();
         log.info("[{}] 크롤링 시작 (직무별 카테고리 수집)", getSiteName());
         int totalSaved = 0;
 
@@ -101,7 +102,10 @@ public class SaraminCrawlerService implements CrawlerService {
             totalSaved += collectByJobType(entry.getKey(), entry.getValue());
         }
 
-        log.info("[{}] 크롤링 완료 - 총 {}개 저장", getSiteName(), totalSaved);
+        // 소요시간 출력 — eager description fetch까지 포함하므로 추적 중요
+        long elapsedSec = (System.currentTimeMillis() - startMs) / 1000;
+        log.info("[{}] 크롤링 완료 - 총 {}개 저장 (소요시간: {}분 {}초)",
+                getSiteName(), totalSaved, elapsedSec / 60, elapsedSec % 60);
     }
 
     /**
@@ -192,6 +196,9 @@ public class SaraminCrawlerService implements CrawlerService {
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
+     * Eager description fetch: 목록에서 sourceUrl을 얻은 직후 상세 페이지 fetch.
+     * fetchDescription은 외부 HTTP 호출이므로 무거우나, 사용자 조회 시 lazy fetch 대기 제거 효과.
+     *
      * @param item    div.item_recruit 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)
      * @return true: 저장됨 / false: 중복으로 스킵
@@ -202,6 +209,11 @@ public class SaraminCrawlerService implements CrawlerService {
 
         String title = titleEl.text().trim();
         String sourceUrl = BASE_URL + titleEl.attr("href");
+
+        // 중복 체크를 먼저 — 이미 있으면 description fetch 자체를 스킵해 부하 감소
+        if (jobRepository.existsBySourceUrl(sourceUrl)) {
+            return false;
+        }
 
         Element corpEl = item.selectFirst("strong.corp_name a");
         String company = (corpEl != null) ? corpEl.text().trim() : "미기재";
@@ -219,8 +231,16 @@ public class SaraminCrawlerService implements CrawlerService {
 
         LocalDate listedAt = parseListedAt(item);
 
+        // Eager fetch — 외부 사이트 부하를 막기 위해 호출 후 짧은 sleep
+        DescriptionResponse descResponse = fetchDescription(sourceUrl);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         return saveJob(title, company, location, experience, deadlineText, sourceUrl,
-                jobType, listedAt, employmentType);
+                jobType, listedAt, employmentType, descResponse);
     }
 
     /**
@@ -230,13 +250,22 @@ public class SaraminCrawlerService implements CrawlerService {
      */
     boolean saveJob(String title, String company, String location,
                     String experience, String deadlineText, String sourceUrl,
-                    String jobType, LocalDate listedAt, String employmentType) {
+                    String jobType, LocalDate listedAt, String employmentType,
+                    DescriptionResponse descResponse) {
+        // 중복 체크는 parseAndSave에서 이미 수행했으나, 단위 테스트가 saveJob을 직접 호출하므로 안전망으로 한 번 더 검사
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
             return false;
         }
 
         LocalDate deadline = parseDeadline(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
+
+        // DescriptionResponse → Job.DescriptionStatus 매핑 및 description 텍스트 추출
+        // SUCCESS만 description 본문 저장, IMAGE/FAILED는 null
+        Job.DescriptionStatus descriptionStatus = mapDescriptionStatus(descResponse);
+        String description = "SUCCESS".equals(descResponse.getStatus())
+                ? descResponse.getDescription()
+                : null;
 
         Job job = Job.builder()
                 .title(title)
@@ -249,11 +278,22 @@ public class SaraminCrawlerService implements CrawlerService {
                 .sourceSite(getSiteName())
                 .jobType(jobType)
                 .listedAt(listedAt)
+                .description(description)
+                .descriptionStatus(descriptionStatus)
                 .build();
 
         job.getTechStacks().addAll(techStacks);
         jobRepository.save(job);
         return true;
+    }
+
+    /** DescriptionResponse.status(문자열) → Job.DescriptionStatus enum */
+    static Job.DescriptionStatus mapDescriptionStatus(DescriptionResponse resp) {
+        return switch (resp.getStatus()) {
+            case "SUCCESS" -> Job.DescriptionStatus.SUCCESS;
+            case "IMAGE"   -> Job.DescriptionStatus.IMAGE;
+            default        -> Job.DescriptionStatus.FAILED; // CRAWL_FAILED 포함
+        };
     }
 
     /**

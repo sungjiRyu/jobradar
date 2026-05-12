@@ -15,6 +15,7 @@ public class JobDetailResponse {
     private final String company;
     private final String title;
     private final String description;
+    private final String descriptionStatus; // SUCCESS / IMAGE / FAILED / null(기존 데이터)
     private final String summary;       // AI 요약 (null이면 미생성)
     private final String location;
     private final String experienceLevel;
@@ -32,6 +33,8 @@ public class JobDetailResponse {
         this.company = job.getCompany();
         this.title = job.getTitle();
         this.description = job.getDescription();
+        this.descriptionStatus = job.getDescriptionStatus() != null
+                ? job.getDescriptionStatus().name() : null;
         this.summary = job.getSummary();
         this.location = job.getLocation();
         this.experienceLevel = job.getExperienceLevel();

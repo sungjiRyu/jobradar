@@ -11,7 +11,8 @@ interface JobDetail {
   id: number;
   company: string;
   title: string;
-  description: string | null; // 크롤링된 원문 (없으면 null)
+  description: string | null;
+  descriptionStatus: "SUCCESS" | "IMAGE" | "FAILED" | null; // 크롤링 결과 상태
   summary: string | null;     // AI가 정리한 JSON 문자열 (없으면 null)
   location: string;
   experienceLevel: string;
@@ -102,15 +103,16 @@ const JobDetailPage = () => {
   };
 
   // ── AI 요약 fetch ─────────────────────────────
-  // hasDescription: DB에 이미 원문이 있으면 true → 크롤링 단계 건너뜀
-  const fetchSummary = async (hasDescription: boolean) => {
+  // descriptionStatus가 이미 있는 경우(SUCCESS/IMAGE/FAILED)는 백엔드 API 1회로 처리
+  // null인 경우(기존 데이터)만 description fetch 선행
+  const fetchSummary = async (descriptionStatus: "SUCCESS" | null) => {
     setSummaryFailReason(undefined);
     setSummary(undefined);
     startDots();
 
     try {
-      // description이 없으면 먼저 크롤링
-      if (!hasDescription) {
+      // null(기존 데이터)은 description fetch 선행 — 백엔드에서 lazy fetch 실행
+      if (descriptionStatus === null) {
         setLoadingStatus("crawling");
         const descRes = await getJobDescription(Number(id));
         const desc = descRes.data.data;
@@ -125,7 +127,7 @@ const JobDetailPage = () => {
         }
       }
 
-      // AI 요약 요청
+      // SUCCESS 또는 lazy fetch 성공 → AI 요약 요청
       setLoadingStatus("ai");
       const summaryRes = await getJobSummary(Number(id));
       const data = summaryRes.data.data;
@@ -152,12 +154,24 @@ const JobDetailPage = () => {
         
         setJob(jobData);
 
-        // DB에 summary가 이미 있으면 바로 사용, 없으면 AI 요약 요청
+        // DB에 summary가 이미 있으면 바로 사용
         if (jobData.summary !== null) {
           setSummary(jobData.summary);
-        } else {
-          fetchSummary(!!jobData.description); // !!로 string|null → boolean 변환
+          return;
         }
+
+        // IMAGE/FAILED는 이미 상태 확정 → API 호출 없이 즉시 메시지 표시
+        if (jobData.descriptionStatus === "IMAGE") {
+          setSummaryFailReason("imageOnly");
+          return;
+        }
+        if (jobData.descriptionStatus === "FAILED") {
+          setSummaryFailReason("crawlerFailed");
+          return;
+        }
+
+        // SUCCESS 또는 null(기존 데이터) → AI 요약 요청
+        fetchSummary(jobData.descriptionStatus);
       } catch (err: any) {
         if (err.response?.status === 404) {
           navigate("/not-found", { replace: true });
@@ -290,7 +304,7 @@ const JobDetailPage = () => {
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-3">상세 내용을 불러오지 못했습니다.</p>
           <button
-            onClick={() => fetchSummary(!!job?.description)}
+            onClick={() => fetchSummary(job?.descriptionStatus === "SUCCESS" ? "SUCCESS" : null)}
             className="text-[13px] text-[#378ADD] hover:underline"
           >
             다시 시도
@@ -298,16 +312,11 @@ const JobDetailPage = () => {
         </div>
       )}
 
-      {/* 3) 크롤링 실패: 네트워크 오류 등 → 재시도 버튼 */}
+      {/* 3) 크롤링 실패: 공고가 내려갔거나 구조 변경 → 원본 링크 안내 */}
       {summaryFailReason === "crawlerFailed" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
-          <p className="text-[13px] text-[#888780] mb-3">공고 정보를 가져오는데 실패했습니다.</p>
-          <button
-            onClick={() => fetchSummary(false)}
-            className="text-[13px] text-[#378ADD] hover:underline"
-          >
-            다시 시도
-          </button>
+          <p className="text-[13px] text-[#888780] mb-1">공고 정보를 가져오는데 실패했습니다.</p>
+          <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
         </div>
       )}
 
