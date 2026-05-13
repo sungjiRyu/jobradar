@@ -45,10 +45,18 @@ const JobListPage = () => {
     setSearchParams(next);
   };
 
-  // 필터 변경 시 state 업데이트 + 페이지 1로 리셋 + 카드 선택 해제
-  const handleFilterChange = (filter: FilterState) => {
-    setCurrentFilter(filter);
-    setActiveCard(null);
+  // 필터 변경 시 state 업데이트 + 페이지 1로 리셋
+  // 정렬만 바뀐 경우엔 현황카드 선택을 유지 (카드 필터 + 정렬 동시 적용)
+  const handleFilterChange = (newFilter: FilterState) => {
+    const onlySortChanged =
+      newFilter.keyword === currentFilter.keyword &&
+      newFilter.job === currentFilter.job &&
+      newFilter.locations.join() === currentFilter.locations.join() &&
+      newFilter.experiences.join() === currentFilter.experiences.join() &&
+      newFilter.techStacks.join() === currentFilter.techStacks.join();
+
+    setCurrentFilter(newFilter);
+    if (!onlySortChanged) setActiveCard(null);
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
 
@@ -100,7 +108,8 @@ const JobListPage = () => {
 
         // 현황 카드 필터
         if (activeCard === "today")  params.todayOnly = true;
-        if (activeCard === "urgent") { params.urgentOnly = true; params.sort = "deadline,asc"; }
+        // 마감임박 카드: urgentOnly 적용 + 사용자가 정렬을 별도로 선택하지 않은 경우에만 기본값(마감일순) 적용
+        if (activeCard === "urgent") { params.urgentOnly = true; if (!currentFilter.sort) params.sort = "deadline,asc"; }
         if (activeCard === "junior") params.experienceLevel = ["신입"];
 
         const res = await getJobs(params);
