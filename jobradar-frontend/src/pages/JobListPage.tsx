@@ -80,7 +80,7 @@ const JobListPage = () => {
 
         // 현황 카드 필터
         if (activeCard === "today")  params.todayOnly = true;
-        if (activeCard === "urgent") params.urgentOnly = true;
+        if (activeCard === "urgent") { params.urgentOnly = true; params.sort = "deadline,asc"; }
         if (activeCard === "junior") params.experienceLevel = ["신입"];
 
         const res = await getJobs(params);
