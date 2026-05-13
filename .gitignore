@@ -35,3 +35,6 @@ Thumbs.db
 # 로그
 *.log
 logs/
+
+# 로컬 스크립트 (운영 DB 접속 정보 포함)
+scripts/
