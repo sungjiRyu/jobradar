@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
+import { addScrap, deleteScrap, getScraps } from "../api/scrapApi";
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -79,6 +80,10 @@ const JobDetailPage = () => {
   const [descStatus, setDescStatus] = useState<"SUCCESS" | "IMAGE" | "EXTERNAL" | "CRAWL_FAILED" | null>(null);
   const [aiSummaryFailed, setAiSummaryFailed] = useState(false); // AI 요약만 실패한 경우
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null);
+
+  // ── 스크랩 상태 ──────────────────────────────
+  const [scrapId, setScrapId] = useState<number | null>(null); // null = 스크랩 안 됨
+  const [scrapLoading, setScrapLoading] = useState(false);
 
   // ── 점(dots) 애니메이션 ───────────────────────
   const [dots, setDots] = useState("");
@@ -168,6 +173,28 @@ const JobDetailPage = () => {
     }
   };
 
+  // ── 스크랩 토글 ──────────────────────────────
+  const handleScrap = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) { navigate("/login"); return; }
+    if (scrapLoading || !job) return;
+
+    setScrapLoading(true);
+    try {
+      if (scrapId !== null) {
+        await deleteScrap(scrapId);
+        setScrapId(null);
+      } else {
+        const res = await addScrap(job.id);
+        setScrapId(res.data.data.scrapId);
+      }
+    } catch {
+      alert("스크랩 처리에 실패했습니다.");
+    } finally {
+      setScrapLoading(false);
+    }
+  };
+
   // ── 초기 데이터 로딩 ─────────────────────────
   useEffect(() => {
     const fetchJob = async () => {
@@ -200,6 +227,17 @@ const JobDetailPage = () => {
         setLoading(false);
       }
     };
+
+    // 로그인 상태면 스크랩 여부 확인
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      getScraps().then((res) => {
+        const found = res.data.data.find(
+          (s: { jobPostId: number; scrapId: number }) => s.jobPostId === Number(id)
+        );
+        if (found) setScrapId(found.scrapId);
+      }).catch(() => {});
+    }
 
     fetchJob();
     return () => stopDots();
@@ -252,7 +290,19 @@ const JobDetailPage = () => {
       <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
         <div className="flex justify-between items-center mb-2">
           <span className="text-[13px] text-[#888780]">{job.company}</span>
-          <span className="text-[12px] text-[#888780]">{job.sourceSite}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] text-[#888780]">{job.sourceSite}</span>
+            <button
+              onClick={handleScrap}
+              disabled={scrapLoading}
+              className={`transition-colors text-lg leading-none ${
+                scrapId !== null ? "text-red-400" : "text-[#DDDDDD] hover:text-red-400"
+              }`}
+              title={scrapId !== null ? "스크랩 취소" : "스크랩"}
+            >
+              {scrapId !== null ? "♥" : "♡"}
+            </button>
+          </div>
         </div>
 
         <h1 className="text-[20px] font-bold text-[#1A1A1A] mb-4">
