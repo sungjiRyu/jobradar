@@ -29,18 +29,10 @@ public class CrawlerScheduler {
     private final JobService jobService;
 
     /**
-     * @Scheduled(cron = "0 0 9 * * *")
-     *
-     * cron 표현식 구조: [초] [분] [시] [일] [월] [요일]
-     *   0   0   3  *   *    *
-     *   ↑   ↑   ↑  ↑   ↑    ↑
-     *  0초 0분 3시 매일 매월 모든요일
-     *
-     * → 매일 새벽 3시 정각에 실행
-     *
+     * cron 표현식: 매일 새벽 3시 정각 실행 (JVM 타임존 Asia/Seoul 기준)
      * [주의] @EnableScheduling이 main 클래스에 있어야 동작함
      */
-    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 3 * * *")
     public void runCrawling() {
         log.info("===== 채용공고 수집 스케줄러 시작 =====");
 
