@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { addScrap } from "../../api/scrapApi";
+import { addScrap, deleteScrap } from "../../api/scrapApi";
 
 export interface Job {
   id: number;
@@ -25,18 +25,17 @@ const calcDday = (deadline: string | null): number | null => {
 
 interface JobCardProps {
   job: Job;
+  initialScrapId?: number | null; // 이미 스크랩된 경우 scrapId 전달
 }
 
-const JobCard = ({ job }: JobCardProps) => {
+const JobCard = ({ job, initialScrapId = null }: JobCardProps) => {
   const navigate = useNavigate();
   const dday = calcDday(job.deadline);
 
-  // 스크랩 완료 여부 — 클릭 후 하트 색상 변경에 사용
-  const [scrapped, setScrapped] = useState(false);
+  const [scrapId, setScrapId] = useState<number | null>(initialScrapId);
   const [loading, setLoading] = useState(false);
 
   const handleScrap = async (e: React.MouseEvent) => {
-    // 카드 전체 클릭 이벤트로 전파되지 않도록 차단
     e.stopPropagation();
 
     const token = localStorage.getItem("accessToken");
@@ -45,14 +44,19 @@ const JobCard = ({ job }: JobCardProps) => {
       return;
     }
 
-    if (scrapped || loading) return;
+    if (loading) return;
 
     try {
       setLoading(true);
-      await addScrap(job.id);
-      setScrapped(true);
+      if (scrapId !== null) {
+        await deleteScrap(scrapId);
+        setScrapId(null);
+      } else {
+        const res = await addScrap(job.id);
+        setScrapId(res.data.data.scrapId);
+      }
     } catch {
-      alert("스크랩에 실패했습니다.");
+      alert("스크랩 처리에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -67,11 +71,11 @@ const JobCard = ({ job }: JobCardProps) => {
           onClick={handleScrap}
           disabled={loading}
           className={`transition-colors text-lg leading-none ${
-            scrapped ? "text-red-400" : "text-[#DDDDDD] hover:text-red-400"
+            scrapId !== null ? "text-red-400" : "text-[#DDDDDD] hover:text-red-400"
           }`}
-          title={scrapped ? "스크랩됨" : "스크랩"}
+          title={scrapId !== null ? "스크랩 취소" : "스크랩"}
         >
-          {scrapped ? "♥" : "♡"}
+          {scrapId !== null ? "♥" : "♡"}
         </button>
       </div>
 

@@ -9,6 +9,7 @@ import Sidebar from "../components/layout/Sidebar";
 import type { Job } from "../components/job/JobCard";
 import { getStatsToday } from "../api/statsApi";
 import type { TodayStats } from "../api/statsApi";
+import { getScraps } from "../api/scrapApi";
 
 const INITIAL_FILTER: FilterState = {
   keyword: "",
@@ -34,6 +35,8 @@ const JobListPage = () => {
   const [currentFilter, setCurrentFilter] = useState<FilterState>(INITIAL_FILTER);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
   const [activeCard, setActiveCard] = useState<"today" | "urgent" | "junior" | null>(null);
+  // jobPostId → scrapId 맵: 스크랩된 공고를 O(1)로 조회하기 위한 캐시
+  const [scrapsMap, setScrapsMap] = useState<Record<number, number>>({});
 
   // 페이지 변경 (Pagination은 0-based → URL은 1-based로 저장)
   const handlePageChange = (newPage: number) => {
@@ -60,6 +63,23 @@ const JobListPage = () => {
     getStatsToday()
       .then(res => setTodayStats(res.data.data))
       .catch(err => console.error("통계 조회 실패:", err));
+  }, []);
+
+  // 로그인 상태일 때 스크랩 목록 조회 (새로고침 후에도 스크랩 상태 복원)
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    getScraps()
+      .then(res => {
+        // { jobPostId: scrapId } 형태로 변환하여 빠른 조회에 사용
+        const map: Record<number, number> = {};
+        for (const scrap of res.data.data) {
+          map[scrap.jobPostId] = scrap.scrapId;
+        }
+        setScrapsMap(map);
+      })
+      .catch(err => console.error("스크랩 목록 조회 실패:", err));
   }, []);
 
   // currentFilter 또는 page 변경 시 API 재호출
@@ -154,7 +174,7 @@ const JobListPage = () => {
               <div className="flex flex-col gap-4">
                 {jobs.map((job) => (
                   <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="cursor-pointer">
-                    <JobCard job={job} />
+                    <JobCard job={job} initialScrapId={scrapsMap[job.id] ?? null} />
                   </div>
                 ))}
               </div>
