@@ -45,10 +45,17 @@ const JobListPage = () => {
     setSearchParams(next);
   };
 
-  // 필터 변경 시 state 업데이트 + 페이지 1로 리셋 + 카드 선택 해제
-  const handleFilterChange = (filter: FilterState) => {
-    setCurrentFilter(filter);
-    setActiveCard(null);
+  // 정렬만 바뀐 경우엔 현황카드 선택을 유지 (카드 필터 + 정렬 동시 적용)
+  const handleFilterChange = (newFilter: FilterState) => {
+    const onlySortChanged =
+      newFilter.keyword === currentFilter.keyword &&
+      newFilter.job === currentFilter.job &&
+      newFilter.locations.join() === currentFilter.locations.join() &&
+      newFilter.experiences.join() === currentFilter.experiences.join() &&
+      newFilter.techStacks.join() === currentFilter.techStacks.join();
+
+    setCurrentFilter(newFilter);
+    if (!onlySortChanged) setActiveCard(null);
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
 
@@ -151,24 +158,20 @@ const JobListPage = () => {
 
       <div className="flex gap-6">
         <div className="flex-1">
-          {/* 로딩 스피너 */}
           {loading && (
             <div className="flex justify-center py-20">
               <div className="w-8 h-8 border-4 border-[#378ADD] border-t-transparent rounded-full animate-spin" />
             </div>
           )}
 
-          {/* 에러 */}
           {!loading && error && (
             <div className="text-center py-20 text-[#E24B4A] text-[14px]">{error}</div>
           )}
 
-          {/* 결과 없음 */}
           {!loading && !error && jobs.length === 0 && (
             <div className="text-center py-20 text-[#888780] text-[14px]">검색 결과가 없습니다.</div>
           )}
 
-          {/* 공고 목록 */}
           {!loading && !error && jobs.length > 0 && (
             <>
               <div className="flex flex-col gap-4">
