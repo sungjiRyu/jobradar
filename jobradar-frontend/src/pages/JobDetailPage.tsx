@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
-import { addScrap, deleteScrap, getScraps } from "../api/scrapApi";
+import { getScraps } from "../api/scrapApi";
+import { useScrap } from "../hooks/useScrap";
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -81,9 +82,7 @@ const JobDetailPage = () => {
   const [aiSummaryFailed, setAiSummaryFailed] = useState(false); // AI 요약만 실패한 경우
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null);
 
-  // ── 스크랩 상태 ──────────────────────────────
-  const [scrapId, setScrapId] = useState<number | null>(null); // null = 스크랩 안 됨
-  const [scrapLoading, setScrapLoading] = useState(false);
+  const { scrapId, setScrapId, scrapLoading, handleScrap } = useScrap(job?.id ?? null);
 
   // ── 점(dots) 애니메이션 ───────────────────────
   const [dots, setDots] = useState("");
@@ -170,28 +169,6 @@ const JobDetailPage = () => {
     } finally {
       stopDots();
       setLoadingStatus(null);
-    }
-  };
-
-  // ── 스크랩 토글 ──────────────────────────────
-  const handleScrap = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) { navigate("/login"); return; }
-    if (scrapLoading || !job) return;
-
-    setScrapLoading(true);
-    try {
-      if (scrapId !== null) {
-        await deleteScrap(scrapId);
-        setScrapId(null);
-      } else {
-        const res = await addScrap(job.id);
-        setScrapId(res.data.data.scrapId);
-      }
-    } catch {
-      alert("스크랩 처리에 실패했습니다.");
-    } finally {
-      setScrapLoading(false);
     }
   };
 
