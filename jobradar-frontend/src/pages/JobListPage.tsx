@@ -107,7 +107,8 @@ const JobListPage = () => {
 
         // 현황 카드 필터
         if (activeCard === "today")  params.todayOnly = true;
-        if (activeCard === "urgent") { params.urgentOnly = true; params.sort = "deadline,asc"; }
+        // 마감임박 카드: urgentOnly 적용 + 사용자가 정렬을 별도로 선택하지 않은 경우에만 기본값(마감일순) 적용
+        if (activeCard === "urgent") { params.urgentOnly = true; if (!currentFilter.sort) params.sort = "deadline,asc"; }
         if (activeCard === "junior") params.experienceLevel = ["신입"];
 
         const res = await getJobs(params);
