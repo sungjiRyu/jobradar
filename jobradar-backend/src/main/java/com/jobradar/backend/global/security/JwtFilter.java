@@ -2,12 +2,14 @@ package com.jobradar.backend.global.security;
 
 import com.jobradar.backend.global.common.ApiResponse;
 import com.jobradar.backend.global.exception.CustomException;
+import com.jobradar.backend.global.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +30,7 @@ import java.util.List;
  * 3. 유효하면 SecurityContext에 인증 정보 저장 → 이후 컨트롤러에서 "로그인된 사용자"로 인식
  * 4. 유효하지 않으면 에러 응답 반환
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
@@ -62,7 +65,11 @@ public class JwtFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (CustomException e) {
-                // 토큰이 만료되거나 위변조된 경우 → 에러 응답 반환 후 필터 체인 중단
+                if (e.getErrorCode() == ErrorCode.EXPIRED_TOKEN) {
+                    log.warn("[JWT] 만료된 토큰: uri={}", request.getRequestURI());
+                } else {
+                    log.warn("[JWT] 유효하지 않은 토큰: uri={}", request.getRequestURI());
+                }
                 sendErrorResponse(response, e);
                 return;
             }

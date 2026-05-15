@@ -9,12 +9,14 @@ import com.jobradar.backend.global.security.JwtProvider;
 import com.jobradar.backend.user.entity.User;
 import com.jobradar.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -48,6 +50,7 @@ public class AuthService {
                 7, TimeUnit.DAYS
         );
 
+        log.info("[Auth] 로그인 성공: email={}", user.getEmail());
         return new TokenResponse(accessToken, refreshToken);
     }
 
@@ -81,12 +84,14 @@ public class AuthService {
                 7, TimeUnit.DAYS
         );
 
+        log.info("[Auth] 토큰 재발급: email={}", email);
         return new TokenResponse(newAccessToken, newRefreshToken);
     }
 
     /** 로그아웃: Redis에서 Refresh 토큰 삭제 */
     public void logout(String email) {
         redisTemplate.delete(REFRESH_KEY_PREFIX + email);
+        log.info("[Auth] 로그아웃: email={}", email);
     }
 
     /** 비밀번호 확인: 현재 비밀번호 일치 여부 검증 */

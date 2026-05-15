@@ -9,11 +9,13 @@ import com.jobradar.backend.user.dto.UserResponse;
 import com.jobradar.backend.user.entity.User;
 import com.jobradar.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -36,7 +38,9 @@ public class UserService {
                 .nickname(request.getNickname())
                 .build();
 
-        return UserResponse.from(userRepository.save(user));
+        UserResponse response = UserResponse.from(userRepository.save(user));
+        log.info("[User] 회원가입: email={}", request.getEmail());
+        return response;
     }
 
     /** 내 정보 조회 */
@@ -53,6 +57,7 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         user.updateNickname(request.getNickname());
+        log.info("[User] 닉네임 변경: email={}", email);
         return UserResponse.from(user);
     }
 
@@ -64,6 +69,7 @@ public class UserService {
 
         // 새 비밀번호를 암호화하여 저장 (현재 비밀번호 확인은 /api/auth/verify-password에서 선행)
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+        log.info("[User] 비밀번호 변경: email={}", email);
     }
 
     /** 회원 탈퇴 */
@@ -75,5 +81,6 @@ public class UserService {
         // Redis에서 Refresh 토큰도 함께 삭제
         redisTemplate.delete("refresh:" + email);
         userRepository.delete(user);
+        log.info("[User] 회원 탈퇴: email={}", email);
     }
 }
