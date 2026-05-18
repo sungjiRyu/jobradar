@@ -1,20 +1,21 @@
 package com.jobradar.backend.global.config;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** Google Gemini API를 사용한 채용공고 AI 정리 서비스 */
+/** Vertex AI (Gemini) 채용공고 AI 요약 서비스 */
 @Slf4j
 @Service
 public class AiSummaryService {
-
-    private static final String GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}";
 
     private static final String PROMPT_TEMPLATE = """
             # Role: Senior Dev & Tech Recruiter
@@ -44,23 +45,55 @@ public class AiSummaryService {
             %s
             """;
 
-    @Value("${gemini.api-key:}")
-    private String apiKey;
+    @Value("${vertex.project-id:}")
+    private String projectId;
 
-    @Value("${gemini.model:}")
+    @Value("${vertex.location:us-central1}")
+    private String location;
+
+    @Value("${vertex.model:gemini-2.5-flash}")
     private String model;
 
+    @Value("${vertex.credentials-path:}")
+    private String credentialsPath;
+
+    private GoogleCredentials credentials;
+    private String vertexUrl;
+
     private final RestClient restClient = RestClient.create();
+
+    /**
+     * 서비스 계정 JSON으로 GoogleCredentials 초기화
+     * credentials-path가 없으면 warn 로그만 남기고 건너뜀 (요약 기능 비활성화)
+     */
+    @PostConstruct
+    public void init() {
+        if (credentialsPath == null || credentialsPath.isBlank()) {
+            log.warn("[Vertex] credentials-path가 설정되지 않아 AI 요약을 사용할 수 없습니다.");
+            return;
+        }
+        try {
+            credentials = GoogleCredentials
+                    .fromStream(new FileInputStream(credentialsPath))
+                    .createScoped("https://www.googleapis.com/auth/cloud-platform");
+            vertexUrl = String.format(
+                    "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+                    location, projectId, location, model);
+            log.info("[Vertex] 서비스 계정 인증 초기화 완료. url={}", vertexUrl);
+        } catch (IOException e) {
+            log.error("[Vertex] 서비스 계정 JSON 로드 실패: {}", e.getMessage());
+        }
+    }
 
     /**
      * 채용공고 description을 받아 구조화된 JSON 문자열 반환
      *
      * @param description 공고 전체 텍스트
-     * @return JSON 문자열 (API 키 없거나 실패 시 null)
+     * @return JSON 문자열 (credentials 없거나 실패 시 null)
      */
     public String summarize(String description) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("[Gemini] API 키가 설정되지 않아 요약을 건너뜁니다.");
+        if (credentials == null) {
+            log.warn("[Vertex] credentials가 초기화되지 않아 요약을 건너뜁니다.");
             return null;
         }
         if (description == null || description.length() < 50) {
@@ -73,17 +106,23 @@ public class AiSummaryService {
 
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("text", PROMPT_TEMPLATE.formatted(trimmed))
-                        ))
+                        Map.of(
+                                "role", "user",
+                                "parts", List.of(Map.of("text", PROMPT_TEMPLATE.formatted(trimmed)))
+                        )
                 )
         );
 
         try {
+            // 토큰 만료 시 자동 갱신 후 Bearer 헤더에 첨부
+            credentials.refreshIfExpired();
+            String token = credentials.getAccessToken().getTokenValue();
+
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.post()
-                    .uri(GEMINI_URL, model, apiKey)
+                    .uri(vertexUrl)
                     .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
                     .body(requestBody)
                     .retrieve()
                     .body(Map.class);
@@ -103,14 +142,12 @@ public class AiSummaryService {
             if (parts == null || parts.isEmpty()) return null;
 
             String result = (String) parts.get(0).get("text");
-
-            // LLM이 ```json ... ``` 마크다운 코드블록으로 감싸는 경우 제거
             String json = stripJsonCodeBlock(result);
-            log.info("[Gemini] JSON 정리 완료 ({}자)", json != null ? json.length() : 0);
+            log.info("[Vertex] JSON 정리 완료 ({}자)", json != null ? json.length() : 0);
             return json;
 
         } catch (Exception e) {
-            log.error("[Gemini] API 호출 실패: {}", e.getMessage());
+            log.error("[Vertex] API 호출 실패: {}", e.getMessage());
             return null;
         }
     }
