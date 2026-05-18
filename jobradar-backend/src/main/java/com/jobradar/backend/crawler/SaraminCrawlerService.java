@@ -210,7 +210,14 @@ public class SaraminCrawlerService implements CrawlerService {
         if (titleEl == null) return false;
 
         String title = titleEl.text().trim();
-        String sourceUrl = BASE_URL + titleEl.attr("href");
+
+        // rec_idx만 추출해 정규화 — 추적/세션 파라미터 제거로 existsBySourceUrl 중복 체크 신뢰성 확보
+        // href 예: /zf_user/jobs/relay/view?view_type=search&rec_idx=53603997&...
+        String href = titleEl.attr("href");
+        Matcher recIdxMatcher = Pattern.compile("[?&]rec_idx=(\\d+)").matcher(href);
+        String sourceUrl = recIdxMatcher.find()
+                ? BASE_URL + "/zf_user/jobs/relay/view?rec_idx=" + recIdxMatcher.group(1)
+                : BASE_URL + href;
 
         // 중복 체크를 먼저 — 이미 있으면 description fetch 자체를 스킵해 부하 감소
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
