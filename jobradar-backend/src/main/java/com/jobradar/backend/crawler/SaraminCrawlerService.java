@@ -268,6 +268,7 @@ public class SaraminCrawlerService implements CrawlerService {
         }
 
         LocalDate deadline = parseDeadline(deadlineText);
+        Job.DeadlineType deadlineType = resolveDeadlineType(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
 
         Job job = Job.builder()
@@ -277,6 +278,7 @@ public class SaraminCrawlerService implements CrawlerService {
                 .experienceLevel(experience)
                 .employmentType(employmentType)
                 .deadline(deadline)
+                .deadlineType(deadlineType)
                 .sourceUrl(sourceUrl)
                 .sourceSite(getSiteName())
                 .jobType(jobType)
@@ -335,6 +337,24 @@ public class SaraminCrawlerService implements CrawlerService {
         }
 
         return null;
+    }
+
+    /**
+     * 마감일 텍스트 → DeadlineType 변환
+     * parseDeadline()과 동일한 기준으로 판단
+     */
+    Job.DeadlineType resolveDeadlineType(String text) {
+        if (text == null || text.isBlank() || text.contains("내일") || text.contains("오늘")) {
+            return Job.DeadlineType.UNKNOWN;
+        }
+        if (text.contains("채용시") || text.contains("상시")) {
+            return Job.DeadlineType.ALWAYS;
+        }
+        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
+        if (matcher.find()) {
+            return Job.DeadlineType.FIXED;
+        }
+        return Job.DeadlineType.UNKNOWN;
     }
 
     /**
