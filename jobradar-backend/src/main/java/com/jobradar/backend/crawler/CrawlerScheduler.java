@@ -28,6 +28,7 @@ public class CrawlerScheduler {
      */
     private final List<CrawlerService> crawlerServices;
     private final JobService jobService;
+    private final AlwaysOpenCheckService alwaysOpenCheckService;
 
     /**
      * CrawlerController에서 수동 트리거 시 호출
@@ -36,6 +37,18 @@ public class CrawlerScheduler {
     @Async
     public void runCrawlAsync() {
         runCrawling();
+    }
+
+    /**
+     * 상시채용 공고 유효성 검사 — 매주 월요일 새벽 3시 실행
+     * 일별 크롤링(runCrawling)과 시각이 같지만 요일 조건으로 분리됨
+     * cron: 초 분 시 일 월 요일 (1=일요일, 2=월요일, ... 7=토요일)
+     */
+    @Scheduled(cron = "0 0 3 * * 2")
+    public void runAlwaysOpenCheck() {
+        log.info("===== 상시채용 유효성 검사 시작 =====");
+        alwaysOpenCheckService.checkAll();
+        log.info("===== 상시채용 유효성 검사 요청 완료 (백그라운드 실행 중) =====");
     }
 
     /**

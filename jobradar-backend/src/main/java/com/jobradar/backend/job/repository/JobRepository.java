@@ -53,6 +53,12 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     List<Job> findByDescriptionStatusIsNull();
 
     /**
+     * 상시채용(ALWAYS) + ACTIVE 공고 전체 조회 — 유효성 검사 대상
+     * deadline = null이라 closeExpiredJobs 대상에서 자동 제외되므로 별도 검사 필요
+     */
+    List<Job> findByDeadlineTypeAndStatus(Job.DeadlineType deadlineType, Job.JobStatus status);
+
+    /**
      * 마감일 지난 ACTIVE 공고를 일괄 CLOSED 처리
      *
      * - deadline < CURRENT_DATE: 마감일이 오늘보다 이전 (오늘 마감은 제외)
