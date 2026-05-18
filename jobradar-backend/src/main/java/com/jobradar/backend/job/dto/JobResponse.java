@@ -18,6 +18,7 @@ public class JobResponse {
     private final String employmentType;
     private final List<String> techStacks;  // 기술스택 이름 목록
     private final LocalDate deadline;
+    private final String deadlineType; // FIXED / ALWAYS / UNKNOWN / null(기존 데이터)
     private final String sourceSite;
     private final String jobType;
     private final int viewCount;
@@ -34,6 +35,7 @@ public class JobResponse {
                 .map(ts -> ts.getName())
                 .toList();
         this.deadline = job.getDeadline();
+        this.deadlineType = job.getDeadlineType() != null ? job.getDeadlineType().name() : null;
         this.sourceSite = job.getSourceSite();
         this.jobType = job.getJobType();
         this.viewCount = job.getViewCount();

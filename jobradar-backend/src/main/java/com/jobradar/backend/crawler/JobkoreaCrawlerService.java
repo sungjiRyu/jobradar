@@ -271,6 +271,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
         }
 
         LocalDate deadline = parseDeadline(deadlineText);
+        Job.DeadlineType deadlineType = resolveDeadlineType(deadlineText);
         List<TechStack> techStacks = resolveTechStacks(title);
 
         // 외부 공고(알바몬/고용24)는 EXTERNAL 상태로 저장, 일반 공고는 null (lazy fetch 대상)
@@ -283,6 +284,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 .experienceLevel(experience)
                 .employmentType(employmentType)
                 .deadline(deadline)
+                .deadlineType(deadlineType)
                 .sourceUrl(sourceUrl)
                 .sourceSite(getSiteName())
                 .jobType(jobType)
@@ -354,6 +356,24 @@ public class JobkoreaCrawlerService implements CrawlerService {
         }
 
         return null;
+    }
+
+    /**
+     * 마감일 텍스트 → DeadlineType 변환
+     * parseDeadline()과 동일한 기준으로 판단
+     */
+    Job.DeadlineType resolveDeadlineType(String text) {
+        if (text == null || text.isBlank() || text.contains("내일") || text.contains("오늘")) {
+            return Job.DeadlineType.UNKNOWN;
+        }
+        if (text.contains("채용시") || text.contains("상시")) {
+            return Job.DeadlineType.ALWAYS;
+        }
+        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
+        if (matcher.find()) {
+            return Job.DeadlineType.FIXED;
+        }
+        return Job.DeadlineType.UNKNOWN;
     }
 
     /**
