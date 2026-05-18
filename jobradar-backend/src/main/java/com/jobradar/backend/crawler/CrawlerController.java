@@ -8,9 +8,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * 크롤링 수동 실행 컨트롤러 (개발/테스트 전용)
  *
@@ -25,43 +22,25 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CrawlerController {
 
-    private final List<CrawlerService> crawlerServices;
+    private final CrawlerScheduler crawlerScheduler;
     private final JobService jobService;
 
     /**
      * POST /api/admin/crawl
-     * 모든 크롤러를 즉시 실행 후 마감 공고를 일괄 CLOSED 처리
+     * 크롤링을 백그라운드에서 비동기 실행 → 즉시 202 Accepted 반환
      *
+     * - 크롤링 1 사이클은 수 분~수십 분 소요되므로 @Async로 분리
+     * - 진행 상황은 서버 로그에서 확인 (===== 채용공고 수집 스케줄러 시작 ===== 등)
      * [인증 필요]
      * SecurityConfig에서 /api/admin/** → authenticated() 설정
      * Authorization: Bearer {accessToken} 헤더 필요
      */
     @PostMapping("/crawl")
     public ResponseEntity<String> crawlNow() {
-        log.info("수동 크롤링 요청 수신");
-
-        List<String> failed = new ArrayList<>();
-        for (CrawlerService crawler : crawlerServices) {
-            try {
-                crawler.collect();
-            } catch (Exception e) {
-                log.error("[{}] 수동 크롤링 실패", crawler.getSiteName(), e);
-                failed.add(crawler.getSiteName());
-            }
-        }
-
-        // 크롤링 완료 후 마감일 지난 공고 일괄 CLOSED 처리
-        try {
-            jobService.closeExpiredJobs();
-        } catch (Exception e) {
-            log.error("마감 공고 정리 중 오류 발생", e);
-        }
-
-        if (!failed.isEmpty()) {
-            return ResponseEntity.internalServerError()
-                    .body("일부 크롤러 실패: " + failed);
-        }
-        return ResponseEntity.ok("크롤링 완료");
+        log.info("수동 크롤링 요청 수신 - 비동기 실행 시작");
+        crawlerScheduler.runCrawlAsync();
+        return ResponseEntity.accepted()
+                .body("크롤링이 백그라운드에서 시작되었습니다. 진행 상황은 서버 로그를 확인하세요.");
     }
 
     /**

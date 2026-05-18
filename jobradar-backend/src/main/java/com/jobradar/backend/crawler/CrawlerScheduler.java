@@ -3,6 +3,7 @@ package com.jobradar.backend.crawler;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,15 @@ public class CrawlerScheduler {
      */
     private final List<CrawlerService> crawlerServices;
     private final JobService jobService;
+
+    /**
+     * CrawlerController에서 수동 트리거 시 호출
+     * @Async로 별도 스레드에서 실행 → HTTP 요청은 즉시 202 반환
+     */
+    @Async
+    public void runCrawlAsync() {
+        runCrawling();
+    }
 
     /**
      * cron 표현식: 매일 새벽 3시 정각 실행 (JVM 타임존 Asia/Seoul 기준)
