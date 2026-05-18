@@ -52,7 +52,13 @@ public class Job {
     @Column(length = 50)
     private String employmentType;  // 고용 형태 (정규직, 계약직, 인턴)
 
-    private LocalDate deadline;   // 지원 마감일 (null이면 상시채용)
+    private LocalDate deadline;   // 지원 마감일 (ALWAYS·UNKNOWN이면 null)
+
+    // 마감일 유형 — deadline = null만으로는 상시채용과 파싱 실패를 구분할 수 없어 별도 컬럼으로 관리
+    // null: 기존 데이터 (마이그레이션 전)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private DeadlineType deadlineType;
 
     @Column(nullable = false)
     private String sourceUrl;     // 원본 공고 URL
@@ -107,7 +113,8 @@ public class Job {
     @Builder
     public Job(String company, String title, String description, String location,
                String experienceLevel, String employmentType,
-               LocalDate deadline, String sourceUrl, String sourceSite,
+               LocalDate deadline, DeadlineType deadlineType,
+               String sourceUrl, String sourceSite,
                String jobType, LocalDate listedAt,
                DescriptionStatus descriptionStatus) {
         this.company = company;
@@ -117,6 +124,7 @@ public class Job {
         this.experienceLevel = experienceLevel;
         this.employmentType = employmentType;
         this.deadline = deadline;
+        this.deadlineType = deadlineType;
         this.sourceUrl = sourceUrl;
         this.sourceSite = sourceSite;
         this.jobType = jobType;
@@ -162,5 +170,14 @@ public class Job {
         IMAGE,     // 이미지 공고 (텍스트 없음)
         EXTERNAL   // 알바몬·고용24 등 외부 사이트 공고
         // FAILED 없음: 크롤링 실패 시 null 유지 → 다음 방문 시 자동 재시도
+    }
+
+    // ===== 마감일 유형 Enum =====
+    // deadline = null만으로는 상시채용과 파싱 실패를 구분할 수 없어 별도 Enum으로 관리
+    // null: 기존 데이터 (컬럼 추가 이전에 수집된 공고)
+    public enum DeadlineType {
+        FIXED,   // 마감일 명시 (deadline 컬럼에 날짜 있음)
+        ALWAYS,  // 상시채용·채용시마감 (deadline = null, 주기적 유효성 검사 대상)
+        UNKNOWN  // 파싱 실패 또는 정보 없음 (deadline = null)
     }
 }

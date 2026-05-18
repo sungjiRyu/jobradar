@@ -22,6 +22,7 @@ public class JobDetailResponse {
     private final String employmentType;
     private final List<String> techStacks;  // 기술스택 이름 목록
     private final LocalDate deadline;
+    private final String deadlineType; // FIXED / ALWAYS / UNKNOWN / null(기존 데이터)
     private final String sourceUrl;
     private final String sourceSite;
     private final String status;
@@ -43,6 +44,7 @@ public class JobDetailResponse {
                 .map(ts -> ts.getName())
                 .toList();
         this.deadline = job.getDeadline();
+        this.deadlineType = job.getDeadlineType() != null ? job.getDeadlineType().name() : null;
         this.sourceUrl = job.getSourceUrl();
         this.sourceSite = job.getSourceSite();
         this.status = job.getStatus().name();
