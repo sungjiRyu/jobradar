@@ -305,7 +305,8 @@ public class SaraminCrawlerService implements CrawlerService {
             return LocalDate.now();
         }
 
-        Matcher matcher = Pattern.compile("(\\d{2})/(\\d{2})").matcher(text);
+        // (\d{1,2}): 한 자리(~5/3) 및 두 자리(~05/03) 모두 매칭
+        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
         if (matcher.find()) {
             int month = Integer.parseInt(matcher.group(1));
             int day   = Integer.parseInt(matcher.group(2));
