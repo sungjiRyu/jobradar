@@ -87,7 +87,7 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +
-           "AND j.experienceLevel = '신입'")
+           "AND j.experienceLevel LIKE '%신입%'")
     long countJunior(@Param("status") Job.JobStatus status);
 
     /**
