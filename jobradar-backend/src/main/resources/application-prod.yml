@@ -30,10 +30,12 @@ jwt:
   access-expiration: 900000
   refresh-expiration: 604800000
 
-# ===== Gemini AI =====
-gemini:
-  api-key: ${GEMINI_API_KEY}
-  model: gemini-2.5-flash
+# ===== Vertex AI =====
+vertex:
+  project-id: ${VERTEX_PROJECT_ID}
+  location: ${VERTEX_LOCATION:us-central1}
+  model: ${VERTEX_MODEL:gemini-2.5-flash-lite}
+  credentials-path: ${VERTEX_CREDENTIALS_PATH}
 
 # ===== Server =====
 server:
