@@ -197,8 +197,9 @@ public class SaraminCrawlerService implements CrawlerService {
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
-     * Eager description fetch: 목록에서 sourceUrl을 얻은 직후 상세 페이지 fetch.
-     * fetchDescription은 외부 HTTP 호출이므로 무거우나, 사용자 조회 시 lazy fetch 대기 제거 효과.
+     * description fetch는 크롤링 시점에 하지 않음 (lazy fetch 방식).
+     * 사용자가 공고 상세 페이지에 처음 진입할 때 fetchDescription()을 호출해 저장.
+     * → descriptionStatus = null로 저장됨
      *
      * @param item    div.item_recruit 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)

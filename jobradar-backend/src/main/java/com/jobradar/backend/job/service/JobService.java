@@ -102,6 +102,7 @@ public class JobService {
         // 기존 데이터(descriptionStatus = null) → lazy fetch 후 결과 저장
         // CRAWL_FAILED는 DB에 저장하지 않음 → null 유지 → 다음 방문 시 재시도
         DescriptionResponse result = fetchDescriptionBySourceSite(job);
+
         if (!"CRAWL_FAILED".equals(result.getStatus())) {
             job.updateDescription(result.getDescription(), mapStatus(result.getStatus()));
         }
@@ -226,22 +227,27 @@ public class JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
 
-        if (job.getSummary() != null) return SummaryResponse.success(job.getSummary());
+        if (job.getSummary() != null) {
+            return SummaryResponse.success(job.getSummary());
+        }
 
         // descriptionStatus 기반 분기
         // null(기존 데이터)이면 lazy fetch 후 status 결정
         Job.DescriptionStatus status = job.getDescriptionStatus();
         if (status == null) {
             DescriptionResponse descResp = fetchDescriptionBySourceSite(job);
+
             if (!"CRAWL_FAILED".equals(descResp.getStatus())) {
                 status = mapStatus(descResp.getStatus());
                 job.updateDescription(descResp.getDescription(), status);
             }
             log.info("[JobService] lazy fetch 완료 (summary용): jobId={}, status={}", jobId, descResp.getStatus());
-            if (status == null) return SummaryResponse.aiFailed(); // CRAWL_FAILED
+            if (status == null) {
+                return SummaryResponse.aiFailed(); // CRAWL_FAILED
+            }
         }
 
-        if (status == Job.DescriptionStatus.IMAGE)    return SummaryResponse.imageOnly();
+        if (status == Job.DescriptionStatus.IMAGE) return SummaryResponse.imageOnly();
         if (status == Job.DescriptionStatus.EXTERNAL) return SummaryResponse.aiFailed();
 
         // SUCCESS → AI 요약

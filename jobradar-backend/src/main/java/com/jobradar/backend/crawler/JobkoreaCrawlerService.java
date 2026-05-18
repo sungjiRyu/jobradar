@@ -202,8 +202,10 @@ public class JobkoreaCrawlerService implements CrawlerService {
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
-     * Eager description fetch: sourceUrl 확보 직후 상세 페이지 fetch.
-     * 잡코리아는 2-step(main page → S3) 이라 사람인보다 1~2배 무거움.
+     * description fetch는 크롤링 시점에 하지 않음 (lazy fetch 방식).
+     * 사용자가 공고 상세 페이지에 처음 진입할 때 fetchDescription()을 호출해 저장.
+     * 외부 공고(알바몬·고용24)는 예외로 크롤링 시점에 EXTERNAL 상태를 확정.
+     * → 일반 공고 descriptionStatus = null, 외부 공고 = EXTERNAL로 저장됨
      *
      * @param item    tr.devloopArea 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)

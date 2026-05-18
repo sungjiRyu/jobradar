@@ -12,7 +12,7 @@ import java.util.List;
  * 채용공고 수집 스케줄러
  *
  * [동작 방식]
- * - 매일 오전 9시에 자동 실행
+ * - 매일 새벽 3시에 자동 실행 (KST 기준, EC2 JVM 타임존 Asia/Seoul 설정 필요)
  * - List<CrawlerService>로 모든 크롤러 구현체를 주입받아 순차 실행
  * - 새 크롤러 추가 시 CrawlerService 구현체만 만들면 자동으로 여기에도 포함됨
  */
