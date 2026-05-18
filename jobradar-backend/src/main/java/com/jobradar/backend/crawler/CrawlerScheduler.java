@@ -3,6 +3,7 @@ package com.jobradar.backend.crawler;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,7 @@ import java.util.List;
  * 채용공고 수집 스케줄러
  *
  * [동작 방식]
- * - 매일 오전 9시에 자동 실행
+ * - 매일 새벽 3시에 자동 실행 (KST 기준, EC2 JVM 타임존 Asia/Seoul 설정 필요)
  * - List<CrawlerService>로 모든 크롤러 구현체를 주입받아 순차 실행
  * - 새 크롤러 추가 시 CrawlerService 구현체만 만들면 자동으로 여기에도 포함됨
  */
@@ -27,6 +28,15 @@ public class CrawlerScheduler {
      */
     private final List<CrawlerService> crawlerServices;
     private final JobService jobService;
+
+    /**
+     * CrawlerController에서 수동 트리거 시 호출
+     * @Async로 별도 스레드에서 실행 → HTTP 요청은 즉시 202 반환
+     */
+    @Async
+    public void runCrawlAsync() {
+        runCrawling();
+    }
 
     /**
      * cron 표현식: 매일 새벽 3시 정각 실행 (JVM 타임존 Asia/Seoul 기준)

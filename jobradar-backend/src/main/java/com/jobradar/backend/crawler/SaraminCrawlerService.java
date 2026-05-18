@@ -66,6 +66,12 @@ public class SaraminCrawlerService implements CrawlerService {
     // 최대 페이지 수 (안전장치): 빈 페이지 또는 중복 감지 시 자동 중단
     static final int MAX_PAGES = 200;
 
+    // 누적 중복 공고가 이 값을 초과하면 수집 종료 (광고 슬롯 등으로 신규가 섞여도 안전하게 처리)
+    static final int MAX_DUPLICATE_COUNT = 20;
+
+    // N페이지 연속으로 모두 중복이면 수집 종료 (광고 슬롯 등으로 중간에 신규가 끼는 경우 대비)
+    static final int MAX_DUPLICATE_PAGES = 3;
+
     // 직무명 → 사람인 cat_kewd 매핑
     // 복수 코드(예: 데이터)는 URL 인코딩된 쉼표(%2C)로 구분
     static final Map<String, String> JOB_TYPE_CODES = Map.ofEntries(
@@ -124,24 +130,28 @@ public class SaraminCrawlerService implements CrawlerService {
     private int collectByJobType(String jobType, String catKewd) {
         log.info("[{}] {} 직무 수집 시작 (cat_kewd={})", getSiteName(), jobType, catKewd);
         int totalSaved = 0;
+        int totalDuplicates = 0;
 
         for (int page = 1; page <= MAX_PAGES; page++) {
             try {
-                int saved = crawlPage(page, catKewd, jobType);
+                int[] result = crawlPage(page, catKewd, jobType);
+                int saved = result[0];
+                int duplicates = result[1];
 
                 if (saved == -1) {
                     log.info("[{}] {} {}페이지에서 공고 없음 → 수집 완료", getSiteName(), jobType, page);
                     break;
                 }
 
-                // 0: 해당 페이지 공고가 모두 DB에 이미 존재 → 조기 종료
-                if (saved == 0) {
-                    log.info("[{}] {} {}페이지 모두 중복 → 수집 종료", getSiteName(), jobType, page);
+                totalDuplicates += duplicates;
+                if (totalDuplicates > MAX_DUPLICATE_COUNT) {
+                    log.info("[{}] {} 누적 중복 {}개 초과 → 수집 종료", getSiteName(), jobType, totalDuplicates);
                     break;
                 }
 
                 totalSaved += saved;
-                log.info("[{}] {} {}페이지 완료 - {}개 저장", getSiteName(), jobType, page, saved);
+                log.info("[{}] {} {}페이지 완료 - {}개 저장 (누적 중복 {}개)",
+                        getSiteName(), jobType, page, saved, totalDuplicates);
 
                 // 서버 부하 방지: 페이지 간 2~4초 랜덤 대기 (규칙적 패턴 회피)
                 Thread.sleep(ThreadLocalRandom.current().nextLong(2000, 4000));
@@ -163,9 +173,9 @@ public class SaraminCrawlerService implements CrawlerService {
      * @param page     페이지 번호 (1부터 시작)
      * @param catKewd  사람인 cat_kewd 파라미터 값
      * @param jobType  직무명 (저장 시 Job.jobType 필드에 기록)
-     * @return 저장된 공고 수 (-1: 마지막 페이지, 0: 모두 중복)
+     * @return int[] { 저장 수, 중복 수 } — 저장 수가 -1이면 마지막 페이지
      */
-    private int crawlPage(int page, String catKewd, String jobType) throws IOException {
+    private int[] crawlPage(int page, String catKewd, String jobType) throws IOException {
         String url = String.format(LIST_URL_TEMPLATE, catKewd, page);
 
         Document doc = Jsoup.connect(url)
@@ -182,7 +192,7 @@ public class SaraminCrawlerService implements CrawlerService {
 
         if (items.isEmpty()) {
             log.info("[{}] {}페이지 공고 없음 → 마지막 페이지 도달", getSiteName(), page);
-            return -1;
+            return new int[]{-1, 0};
         }
 
         int savedCount = 0;
@@ -191,14 +201,15 @@ public class SaraminCrawlerService implements CrawlerService {
                 savedCount++;
             }
         }
-        return savedCount;
+        return new int[]{savedCount, items.size() - savedCount};
     }
 
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
-     * Eager description fetch: 목록에서 sourceUrl을 얻은 직후 상세 페이지 fetch.
-     * fetchDescription은 외부 HTTP 호출이므로 무거우나, 사용자 조회 시 lazy fetch 대기 제거 효과.
+     * description fetch는 크롤링 시점에 하지 않음 (lazy fetch 방식).
+     * 사용자가 공고 상세 페이지에 처음 진입할 때 fetchDescription()을 호출해 저장.
+     * → descriptionStatus = null로 저장됨
      *
      * @param item    div.item_recruit 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)
@@ -209,7 +220,14 @@ public class SaraminCrawlerService implements CrawlerService {
         if (titleEl == null) return false;
 
         String title = titleEl.text().trim();
-        String sourceUrl = BASE_URL + titleEl.attr("href");
+
+        // rec_idx만 추출해 정규화 — 추적/세션 파라미터 제거로 existsBySourceUrl 중복 체크 신뢰성 확보
+        // href 예: /zf_user/jobs/relay/view?view_type=search&rec_idx=53603997&...
+        String href = titleEl.attr("href");
+        Matcher recIdxMatcher = Pattern.compile("[?&]rec_idx=(\\d+)").matcher(href);
+        String sourceUrl = recIdxMatcher.find()
+                ? BASE_URL + "/zf_user/jobs/relay/view?rec_idx=" + recIdxMatcher.group(1)
+                : BASE_URL + href;
 
         // 중복 체크를 먼저 — 이미 있으면 description fetch 자체를 스킵해 부하 감소
         if (jobRepository.existsBySourceUrl(sourceUrl)) {
@@ -304,7 +322,8 @@ public class SaraminCrawlerService implements CrawlerService {
             return LocalDate.now();
         }
 
-        Matcher matcher = Pattern.compile("(\\d{2})/(\\d{2})").matcher(text);
+        // (\d{1,2}): 한 자리(~5/3) 및 두 자리(~05/03) 모두 매칭
+        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
         if (matcher.find()) {
             int month = Integer.parseInt(matcher.group(1));
             int day   = Integer.parseInt(matcher.group(2));

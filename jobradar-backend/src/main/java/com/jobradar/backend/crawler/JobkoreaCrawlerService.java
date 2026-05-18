@@ -66,6 +66,9 @@ public class JobkoreaCrawlerService implements CrawlerService {
     // 최대 페이지 수 (안전장치)
     static final int MAX_PAGES = 200;
 
+    // 누적 중복 공고가 이 값을 초과하면 수집 종료
+    static final int MAX_DUPLICATE_COUNT = 20;
+
     // 직무명 → 잡코리아 duty 코드 매핑
     // 복수 코드(예: 데이터)는 쉼표로 구분
     // 참고: 잡코리아는 DevOps 카테고리를 별도로 제공하지 않으므로 지원 직무에서 제외
@@ -122,24 +125,28 @@ public class JobkoreaCrawlerService implements CrawlerService {
     private int collectByJobType(String jobType, String duty) {
         log.info("[{}] {} 직무 수집 시작 (duty={})", getSiteName(), jobType, duty);
         int totalSaved = 0;
+        int totalDuplicates = 0;
 
         for (int page = 1; page <= MAX_PAGES; page++) {
             try {
-                int saved = crawlPage(page, duty, jobType);
+                int[] result = crawlPage(page, duty, jobType);
+                int saved = result[0];
+                int duplicates = result[1];
 
                 if (saved == -1) {
                     log.info("[{}] {} {}페이지에서 공고 없음 → 수집 완료", getSiteName(), jobType, page);
                     break;
                 }
 
-                // 0: 해당 페이지 공고가 모두 DB에 이미 존재 → 조기 종료
-                if (saved == 0) {
-                    log.info("[{}] {} {}페이지 모두 중복 → 수집 종료", getSiteName(), jobType, page);
+                totalDuplicates += duplicates;
+                if (totalDuplicates > MAX_DUPLICATE_COUNT) {
+                    log.info("[{}] {} 누적 중복 {}개 초과 → 수집 종료", getSiteName(), jobType, totalDuplicates);
                     break;
                 }
 
                 totalSaved += saved;
-                log.info("[{}] {} {}페이지 완료 - {}개 저장", getSiteName(), jobType, page, saved);
+                log.info("[{}] {} {}페이지 완료 - {}개 저장 (누적 중복 {}개)",
+                        getSiteName(), jobType, page, saved, totalDuplicates);
 
                 // 서버 부하 방지: 페이지 간 2~4초 랜덤 대기 (규칙적 패턴 회피)
                 Thread.sleep(ThreadLocalRandom.current().nextLong(2000, 4000));
@@ -166,9 +173,9 @@ public class JobkoreaCrawlerService implements CrawlerService {
      * @param page     페이지 번호
      * @param duty     잡코리아 duty 파라미터 값
      * @param jobType  직무명 (Job.jobType 필드에 저장)
-     * @return 저장된 공고 수 (-1: 마지막 페이지, 0: 모두 중복)
+     * @return int[] { 저장 수, 중복 수 } — 저장 수가 -1이면 마지막 페이지
      */
-    private int crawlPage(int page, String duty, String jobType) throws IOException {
+    private int[] crawlPage(int page, String duty, String jobType) throws IOException {
         Document doc = Jsoup.connect(POST_URL)
                 .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                         + "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -187,7 +194,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
 
         if (items.isEmpty()) {
             log.info("[{}] {}페이지 공고 없음 → 마지막 페이지 도달", getSiteName(), page);
-            return -1;
+            return new int[]{-1, 0};
         }
 
         int savedCount = 0;
@@ -196,14 +203,16 @@ public class JobkoreaCrawlerService implements CrawlerService {
                 savedCount++;
             }
         }
-        return savedCount;
+        return new int[]{savedCount, items.size() - savedCount};
     }
 
     /**
      * 공고 HTML 항목에서 데이터 추출 후 저장
      *
-     * Eager description fetch: sourceUrl 확보 직후 상세 페이지 fetch.
-     * 잡코리아는 2-step(main page → S3) 이라 사람인보다 1~2배 무거움.
+     * description fetch는 크롤링 시점에 하지 않음 (lazy fetch 방식).
+     * 사용자가 공고 상세 페이지에 처음 진입할 때 fetchDescription()을 호출해 저장.
+     * 외부 공고(알바몬·고용24)는 예외로 크롤링 시점에 EXTERNAL 상태를 확정.
+     * → 일반 공고 descriptionStatus = null, 외부 공고 = EXTERNAL로 저장됨
      *
      * @param item    tr.devloopArea 엘리먼트
      * @param jobType 직무명 (Job 엔티티에 저장)
@@ -332,7 +341,8 @@ public class JobkoreaCrawlerService implements CrawlerService {
             return LocalDate.now();
         }
 
-        Matcher matcher = Pattern.compile("(\\d{2})/(\\d{2})").matcher(text);
+        // (\d{1,2}): 한 자리(~5/3) 및 두 자리(~05/03) 모두 매칭
+        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
         if (matcher.find()) {
             int month = Integer.parseInt(matcher.group(1));
             int day   = Integer.parseInt(matcher.group(2));
