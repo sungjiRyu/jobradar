@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,13 +40,13 @@ public class CrawlerController {
     public ResponseEntity<String> crawlNow() {
         log.info("수동 크롤링 요청 수신");
 
+        List<String> failed = new ArrayList<>();
         for (CrawlerService crawler : crawlerServices) {
             try {
                 crawler.collect();
             } catch (Exception e) {
                 log.error("[{}] 수동 크롤링 실패", crawler.getSiteName(), e);
-                return ResponseEntity.internalServerError()
-                        .body("[" + crawler.getSiteName() + "] 크롤링 실패: " + e.getMessage());
+                failed.add(crawler.getSiteName());
             }
         }
 
@@ -56,6 +57,10 @@ public class CrawlerController {
             log.error("마감 공고 정리 중 오류 발생", e);
         }
 
+        if (!failed.isEmpty()) {
+            return ResponseEntity.internalServerError()
+                    .body("일부 크롤러 실패: " + failed);
+        }
         return ResponseEntity.ok("크롤링 완료");
     }
 
