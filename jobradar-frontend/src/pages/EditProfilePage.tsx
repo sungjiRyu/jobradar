@@ -5,8 +5,14 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMe, updateNickname, updatePassword, withdrawUser } from "../api/userApi";
+import {
+  getMe,
+  updateNickname,
+  updatePassword,
+  withdrawUser,
+} from "../api/userApi";
 import { usePageTitle } from "../hooks/usePageTitle";
+import useAuthStore from "../store/authStore";
 
 const EditProfilePage = () => {
   usePageTitle("정보 수정");
@@ -87,14 +93,14 @@ const EditProfilePage = () => {
 
   // 회원 탈퇴 핸들러
   const handleWithdraw = async () => {
-    if (!window.confirm("정말 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.")) return;
+    if (!window.confirm("정말 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다."))
+      return;
 
     try {
       setWithdrawLoading(true);
       await withdrawUser();
       // 탈퇴 성공 시 토큰 삭제 후 로그인 페이지로 이동
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
+      useAuthStore.getState().logout();
       navigate("/login");
     } catch {
       alert("회원 탈퇴에 실패했습니다.");
@@ -106,7 +112,6 @@ const EditProfilePage = () => {
   return (
     <main className="min-h-screen bg-[#F5F5F5] px-4 py-8">
       <div className="max-w-4xl mx-auto flex flex-col gap-6">
-
         {/* 상단 스텝 인디케이터 */}
         <div className="flex items-center gap-3">
           {/* 1단계: 완료 */}
@@ -125,7 +130,9 @@ const EditProfilePage = () => {
             <div className="w-7 h-7 rounded-full bg-[#378ADD] text-white text-[12px] font-bold flex items-center justify-center">
               2
             </div>
-            <span className="text-[13px] font-medium text-[#378ADD]">정보 수정</span>
+            <span className="text-[13px] font-medium text-[#378ADD]">
+              정보 수정
+            </span>
           </div>
         </div>
 
@@ -137,7 +144,9 @@ const EditProfilePage = () => {
             <div className="grid grid-cols-2 gap-4">
               {/* 현재 닉네임 (읽기 전용) */}
               <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-medium text-[#888780]">현재 닉네임</label>
+                <label className="text-[12px] font-medium text-[#888780]">
+                  현재 닉네임
+                </label>
                 <input
                   type="text"
                   value={currentNickname}
@@ -148,7 +157,9 @@ const EditProfilePage = () => {
 
               {/* 새 닉네임 입력 */}
               <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-medium text-[#888780]">새 닉네임</label>
+                <label className="text-[12px] font-medium text-[#888780]">
+                  새 닉네임
+                </label>
                 <input
                   type="text"
                   placeholder="새 닉네임을 입력하세요"
@@ -161,7 +172,9 @@ const EditProfilePage = () => {
 
             {/* 피드백 메시지 */}
             {nicknameMsg.text && (
-              <p className={`text-[11px] mt-2 ${nicknameMsg.type === "success" ? "text-[#27500A]" : "text-[#A32D2D]"}`}>
+              <p
+                className={`text-[11px] mt-2 ${nicknameMsg.type === "success" ? "text-[#27500A]" : "text-[#A32D2D]"}`}
+              >
                 {nicknameMsg.text}
               </p>
             )}
@@ -184,7 +197,9 @@ const EditProfilePage = () => {
             <div className="grid grid-cols-2 gap-4">
               {/* 새 비밀번호 */}
               <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-medium text-[#888780]">새 비밀번호</label>
+                <label className="text-[12px] font-medium text-[#888780]">
+                  새 비밀번호
+                </label>
                 <input
                   type="password"
                   placeholder="새 비밀번호를 입력하세요"
@@ -196,7 +211,9 @@ const EditProfilePage = () => {
 
               {/* 새 비밀번호 확인 */}
               <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-medium text-[#888780]">새 비밀번호 확인</label>
+                <label className="text-[12px] font-medium text-[#888780]">
+                  새 비밀번호 확인
+                </label>
                 <input
                   type="password"
                   placeholder="새 비밀번호를 다시 입력하세요"
@@ -209,7 +226,9 @@ const EditProfilePage = () => {
 
             {/* 피드백 메시지 */}
             {passwordMsg.text && (
-              <p className={`text-[11px] mt-2 ${passwordMsg.type === "success" ? "text-[#27500A]" : "text-[#A32D2D]"}`}>
+              <p
+                className={`text-[11px] mt-2 ${passwordMsg.type === "success" ? "text-[#27500A]" : "text-[#A32D2D]"}`}
+              >
                 {passwordMsg.text}
               </p>
             )}
@@ -228,7 +247,8 @@ const EditProfilePage = () => {
         <section className="bg-white border border-[#DDDDDD] rounded-xl p-6">
           <h2 className="text-[16px] font-semibold mb-2">회원 탈퇴</h2>
           <p className="text-[13px] text-[#888780] mb-4">
-            탈퇴 시 모든 스크랩 및 지원 현황 데이터가 영구 삭제되며 복구할 수 없습니다.
+            탈퇴 시 모든 스크랩 및 지원 현황 데이터가 영구 삭제되며 복구할 수
+            없습니다.
           </p>
           <button
             type="button"
@@ -248,7 +268,6 @@ const EditProfilePage = () => {
         >
           ← 마이페이지로 돌아가기
         </button>
-
       </div>
     </main>
   );

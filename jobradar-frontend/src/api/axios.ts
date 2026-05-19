@@ -1,4 +1,5 @@
 import axios from "axios";
+import useAuthStore from "../store/authStore";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
@@ -29,9 +30,12 @@ api.interceptors.response.use(
         const refreshToken = localStorage.getItem("refreshToken");
 
         // 토큰 재발급 요청
-        const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/auth/refresh`, {
-          refreshToken,
-        });
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/auth/refresh`,
+          {
+            refreshToken,
+          },
+        );
 
         const newAccessToken = res.data.data.accessToken;
         localStorage.setItem("accessToken", newAccessToken);
@@ -41,8 +45,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         // 재발급도 실패하면 로그아웃 처리
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        useAuthStore.getState().logout();
         window.location.href = "/login";
       }
     }
