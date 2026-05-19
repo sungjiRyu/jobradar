@@ -27,7 +27,8 @@ public enum ErrorCode {
 
     // 스크랩
     SCRAP_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 스크랩한 공고입니다."),
-    SCRAP_NOT_FOUND(HttpStatus.NOT_FOUND, "스크랩 정보를 찾을 수 없습니다.");
+    SCRAP_NOT_FOUND(HttpStatus.NOT_FOUND, "스크랩 정보를 찾을 수 없습니다."),
+    SCRAP_CLOSED_JOB(HttpStatus.BAD_REQUEST, "마감된 공고는 스크랩할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
