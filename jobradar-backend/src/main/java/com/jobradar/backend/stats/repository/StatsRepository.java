@@ -20,14 +20,17 @@ import java.util.List;
 public interface StatsRepository extends JpaRepository<Job, Long> {
 
     /**
-     * 전체 활성 공고 수
-     * Spring Data JPA가 메서드명을 분석해서 자동으로 SQL 생성:
-     * SELECT COUNT(*) FROM job_posts WHERE status = ?
+     * 전체 활성 공고 수 — 마감일 지난 공고 제외
+     * 공고 리스트와 동일한 기준(JobSpecification.deadlineNotPassed)을 유지하기 위해
+     * Spring Data JPA 파생 쿼리 대신 명시적 JPQL 사용.
      */
-    long countByStatus(Job.JobStatus status);
+    @Query("SELECT COUNT(j) FROM Job j " +
+           "WHERE j.status = :status " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today)")
+    long countByStatus(@Param("status") Job.JobStatus status, @Param("today") LocalDate today);
 
     /**
-     * 기술스택별 공고 수 집계 (상위 N개)
+     * 기술스택별 공고 수 집계 (상위 N개) — 마감일 지난 공고 제외
      *
      * [JPQL 설명]
      * - JOIN j.techStacks ts: Job 엔티티의 techStacks 컬렉션과 조인 (job_post_stacks 테이블 경유)
@@ -37,12 +40,15 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
     @Query("SELECT new com.jobradar.backend.stats.dto.TechStackStatResponse(ts.name, COUNT(j)) " +
            "FROM Job j JOIN j.techStacks ts " +
            "WHERE j.status = :status " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today) " +
            "GROUP BY ts.name " +
            "ORDER BY COUNT(j) DESC")
-    List<TechStackStatResponse> findTechStackStats(@Param("status") Job.JobStatus status, Pageable pageable);
+    List<TechStackStatResponse> findTechStackStats(@Param("status") Job.JobStatus status,
+                                                   @Param("today") LocalDate today,
+                                                   Pageable pageable);
 
     /**
-     * 지역별 공고 수 집계
+     * 지역별 공고 수 집계 — 마감일 지난 공고 제외
      *
      * [JPQL 설명]
      * - j.location 기준 GROUP BY
@@ -51,21 +57,24 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
     @Query("SELECT new com.jobradar.backend.stats.dto.LocationStatResponse(j.location, COUNT(j)) " +
            "FROM Job j " +
            "WHERE j.status = :status " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today) " +
            "GROUP BY j.location " +
            "ORDER BY COUNT(j) DESC")
-    List<LocationStatResponse> findLocationStats(@Param("status") Job.JobStatus status);
+    List<LocationStatResponse> findLocationStats(@Param("status") Job.JobStatus status,
+                                                 @Param("today") LocalDate today);
 
     /**
-     * 오늘 신규 등록 공고 수
-     *
+     * 오늘 신규 등록 공고 수 — 마감일 지난 공고 제외
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +
            "AND j.createdAt >= :startOfDay " +
-           "AND j.createdAt < :endOfDay")
+           "AND j.createdAt < :endOfDay " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today)")
     long countToday(@Param("status") Job.JobStatus status,
                     @Param("startOfDay") LocalDateTime startOfDay,
-                    @Param("endOfDay") LocalDateTime endOfDay);
+                    @Param("endOfDay") LocalDateTime endOfDay,
+                    @Param("today") LocalDate today);
 
     /**
      * 마감 임박 공고 수 (오늘 ~ D+7)
@@ -73,6 +82,7 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
      * [JPQL 설명]
      * - BETWEEN :today AND :limit: 오늘부터 7일 이내 마감 공고
      * - deadline IS NOT NULL: 상시채용(null) 제외
+     * - today >= deadline 조건은 이미 deadline >= today로 포함됨
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +
@@ -83,15 +93,16 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
                      @Param("limit") LocalDate limit);
 
     /**
-     * 신입 공고 수
+     * 신입 공고 수 — 마감일 지난 공고 제외
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +
-           "AND j.experienceLevel LIKE '%신입%'")
-    long countJunior(@Param("status") Job.JobStatus status);
+           "AND j.experienceLevel LIKE '%신입%' " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today)")
+    long countJunior(@Param("status") Job.JobStatus status, @Param("today") LocalDate today);
 
     /**
-     * 경력별 공고 수 집계
+     * 경력별 공고 수 집계 — 마감일 지난 공고 제외
      *
      * [JPQL 설명]
      * - experienceLevel IS NOT NULL: 경력 정보 없는 공고 제외
@@ -101,7 +112,9 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
            "FROM Job j " +
            "WHERE j.status = :status " +
            "AND j.experienceLevel IS NOT NULL " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today) " +
            "GROUP BY j.experienceLevel " +
            "ORDER BY COUNT(j) DESC")
-    List<ExperienceStatResponse> findExperienceStats(@Param("status") Job.JobStatus status);
+    List<ExperienceStatResponse> findExperienceStats(@Param("status") Job.JobStatus status,
+                                                    @Param("today") LocalDate today);
 }

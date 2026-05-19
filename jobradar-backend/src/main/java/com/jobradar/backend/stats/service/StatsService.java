@@ -41,7 +41,7 @@ public class StatsService {
     @Cacheable(value = CacheConfig.CACHE_TECH_STACKS, key = "'all'")
     public List<TechStackStatResponse> getTechStackStats() {
         // PageRequest.of(0, 8): 첫 번째 페이지, 8개 제한 → SQL LIMIT 8 역할
-        return statsRepository.findTechStackStats(Job.JobStatus.ACTIVE, PageRequest.of(0, 8));
+        return statsRepository.findTechStackStats(Job.JobStatus.ACTIVE, LocalDate.now(), PageRequest.of(0, 8));
     }
 
     /**
@@ -52,7 +52,7 @@ public class StatsService {
      */
     @Cacheable(value = CacheConfig.CACHE_LOCATIONS, key = "'all'")
     public List<LocationStatResponse> getLocationStats() {
-        List<LocationStatResponse> stats = statsRepository.findLocationStats(Job.JobStatus.ACTIVE);
+        List<LocationStatResponse> stats = statsRepository.findLocationStats(Job.JobStatus.ACTIVE, LocalDate.now());
 
         // 전체 공고 수 합산
         long total = stats.stream().mapToLong(LocationStatResponse::getCount).sum();
@@ -76,10 +76,10 @@ public class StatsService {
         LocalDateTime startOfDay = today.atStartOfDay();           // 오늘 00:00:00
         LocalDateTime endOfDay = today.plusDays(1).atStartOfDay(); // 내일 00:00:00
 
-        long totalCount  = statsRepository.countByStatus(Job.JobStatus.ACTIVE);
-        long todayCount  = statsRepository.countToday(Job.JobStatus.ACTIVE, startOfDay, endOfDay);
+        long totalCount  = statsRepository.countByStatus(Job.JobStatus.ACTIVE, today);
+        long todayCount  = statsRepository.countToday(Job.JobStatus.ACTIVE, startOfDay, endOfDay, today);
         long urgentCount = statsRepository.countUrgent(Job.JobStatus.ACTIVE, today, today.plusDays(7));
-        long juniorCount = statsRepository.countJunior(Job.JobStatus.ACTIVE);
+        long juniorCount = statsRepository.countJunior(Job.JobStatus.ACTIVE, today);
 
         return new TodayStatResponse(totalCount, todayCount, urgentCount, juniorCount);
     }
@@ -91,7 +91,7 @@ public class StatsService {
      */
     @Cacheable(value = CacheConfig.CACHE_EXPERIENCE, key = "'all'")
     public List<ExperienceStatResponse> getExperienceStats() {
-        List<ExperienceStatResponse> stats = statsRepository.findExperienceStats(Job.JobStatus.ACTIVE);
+        List<ExperienceStatResponse> stats = statsRepository.findExperienceStats(Job.JobStatus.ACTIVE, LocalDate.now());
 
         long total = stats.stream().mapToLong(ExperienceStatResponse::getCount).sum();
 
