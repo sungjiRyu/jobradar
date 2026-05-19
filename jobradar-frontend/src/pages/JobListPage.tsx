@@ -35,9 +35,12 @@ const JobListPage = () => {
   const [error, setError] = useState("");
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [currentFilter, setCurrentFilter] = useState<FilterState>(INITIAL_FILTER);
+  const [currentFilter, setCurrentFilter] =
+    useState<FilterState>(INITIAL_FILTER);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
-  const [activeCard, setActiveCard] = useState<"all" | "today" | "urgent" | "junior" | null>(null);
+  const [activeCard, setActiveCard] = useState<
+    "all" | "today" | "urgent" | "junior" | null
+  >(null);
   // jobPostId → scrapId 맵: 스크랩된 공고를 O(1)로 조회하기 위한 캐시
   const [scrapsMap, setScrapsMap] = useState<Record<number, number>>({});
 
@@ -65,15 +68,15 @@ const JobListPage = () => {
   // 현황 카드 클릭 — 같은 카드 재클릭 시 해제, "all" 클릭 시 필터 초기화
   const handleCardClick = (card: "all" | "today" | "urgent" | "junior") => {
     if (card === "all") setCurrentFilter({ ...INITIAL_FILTER });
-    setActiveCard(prev => prev === card ? null : card);
+    setActiveCard((prev) => (prev === card ? null : card));
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
 
   // 오늘의 현황 통계 (최초 1회)
   useEffect(() => {
     getStatsToday()
-      .then(res => setTodayStats(res.data.data))
-      .catch(err => console.error("통계 조회 실패:", err));
+      .then((res) => setTodayStats(res.data.data))
+      .catch((err) => console.error("통계 조회 실패:", err));
   }, []);
 
   // 로그인 상태일 때 스크랩 목록 조회 (새로고침 후에도 스크랩 상태 복원)
@@ -82,7 +85,7 @@ const JobListPage = () => {
     if (!token) return;
 
     getScraps()
-      .then(res => {
+      .then((res) => {
         // { jobPostId: scrapId } 형태로 변환하여 빠른 조회에 사용
         const map: Record<number, number> = {};
         for (const scrap of res.data.data) {
@@ -90,7 +93,7 @@ const JobListPage = () => {
         }
         setScrapsMap(map);
       })
-      .catch(err => console.error("스크랩 목록 조회 실패:", err));
+      .catch((err) => console.error("스크랩 목록 조회 실패:", err));
   }, []);
 
   // currentFilter 또는 page 변경 시 API 재호출
@@ -100,19 +103,28 @@ const JobListPage = () => {
       setError("");
 
       try {
-        const params: Record<string, string | number | string[] | boolean> = { page, size: 10 };
+        const params: Record<string, string | number | string[] | boolean> = {
+          page,
+          size: 10,
+        };
 
         if (currentFilter.keyword) params.keyword = currentFilter.keyword;
         if (currentFilter.job) params.jobType = currentFilter.job;
-        if (currentFilter.locations.length > 0) params.location = currentFilter.locations;
-        if (currentFilter.experiences.length > 0) params.experienceLevel = currentFilter.experiences;
-        if (currentFilter.techStacks.length > 0) params.techStack = currentFilter.techStacks;
+        if (currentFilter.locations.length > 0)
+          params.location = currentFilter.locations;
+        if (currentFilter.experiences.length > 0)
+          params.experienceLevel = currentFilter.experiences;
+        if (currentFilter.techStacks.length > 0)
+          params.techStack = currentFilter.techStacks;
         if (currentFilter.sort) params.sort = currentFilter.sort;
 
         // 현황 카드 필터
-        if (activeCard === "today")  params.todayOnly = true;
+        if (activeCard === "today") params.todayOnly = true;
         // 마감임박 카드: urgentOnly 적용 + 사용자가 정렬을 별도로 선택하지 않은 경우에만 기본값(마감일순) 적용
-        if (activeCard === "urgent") { params.urgentOnly = true; if (!currentFilter.sort) params.sort = "deadline,asc"; }
+        if (activeCard === "urgent") {
+          params.urgentOnly = true;
+          if (!currentFilter.sort) params.sort = "deadline,asc";
+        }
         if (activeCard === "junior") params.experienceLevel = ["신입"];
 
         const res = await getJobs(params);
@@ -140,18 +152,39 @@ const JobListPage = () => {
       {/* 오늘의 현황 카드 — 모바일: 2x2, lg+: 4x1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]", card: "all" as const },
-          { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]", card: "today" as const },
-          { label: "마감 임박", value: todayStats?.urgentCount, color: "text-[#E24B4A]", card: "urgent" as const },
-          { label: "신입 공고", value: todayStats?.juniorCount, color: "text-[#1D9E75]", card: "junior" as const },
-        ].map(item => (
+          {
+            label: "전체 공고",
+            value: todayStats?.totalCount,
+            color: "text-[#1A1A1A]",
+            card: "all" as const,
+          },
+          {
+            label: "오늘 신규",
+            value: todayStats?.todayCount,
+            color: "text-[#378ADD]",
+            card: "today" as const,
+          },
+          {
+            label: "마감 임박",
+            value: todayStats?.urgentCount,
+            color: "text-[#E24B4A]",
+            card: "urgent" as const,
+          },
+          {
+            label: "신입 공고",
+            value: todayStats?.juniorCount,
+            color: "text-[#1D9E75]",
+            card: "junior" as const,
+          },
+        ].map((item) => (
           <div
             key={item.label}
             onClick={() => handleCardClick(item.card)}
             className={`rounded-[10px] border px-4 py-3 flex flex-col gap-0.5 cursor-pointer transition-all
-              ${activeCard === item.card
-                ? "bg-[#F0F7FF] border-[#378ADD] shadow-sm"
-                : "bg-white border-[#DDDDDD]"
+              ${
+                activeCard === item.card
+                  ? "bg-[#F0F7FF] border-[#378ADD] shadow-sm"
+                  : "bg-white border-[#DDDDDD]"
               }`}
           >
             <span className="text-[11px] text-[#888780]">{item.label}</span>
@@ -171,31 +204,51 @@ const JobListPage = () => {
           )}
 
           {!loading && error && (
-            <div className="text-center py-20 text-[#E24B4A] text-[14px]">{error}</div>
+            <div className="text-center py-20 text-[#E24B4A] text-[14px]">
+              {error}
+            </div>
           )}
 
           {!loading && !error && jobs.length === 0 && (
-            <div className="text-center py-20 text-[#888780] text-[14px]">검색 결과가 없습니다.</div>
+            <div className="text-center py-20 text-[#888780] text-[14px]">
+              검색 결과가 없습니다.
+            </div>
           )}
 
           {!loading && !error && jobs.length > 0 && (
             <>
               <div className="text-[13px] text-[#888780] mb-3">
-                검색 결과 <span className="font-semibold text-[#1A1A1A]">{totalElements.toLocaleString()}</span>개
+                검색 결과{" "}
+                <span className="font-semibold text-[#1A1A1A]">
+                  {totalElements.toLocaleString()}
+                </span>
+                개
               </div>
               <div className="flex flex-col gap-4">
                 {jobs.map((job) => (
-                  <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="cursor-pointer">
-                    <JobCard job={job} initialScrapId={scrapsMap[job.id] ?? null} />
+                  <div
+                    key={job.id}
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <JobCard
+                      job={job}
+                      initialScrapId={scrapsMap[job.id] ?? null}
+                    />
                   </div>
                 ))}
               </div>
-              <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
             </>
           )}
         </div>
-
-        <Sidebar />
+        <div className="hidden lg:block lg:mt-[30px]">
+          <Sidebar />
+        </div>
       </div>
     </div>
   );
