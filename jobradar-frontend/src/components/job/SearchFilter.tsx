@@ -273,7 +273,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
 
               {/* 드롭다운 패널 */}
               {isOpen && (
-                <div className="absolute top-[calc(100%+6px)] left-0 min-w-[220px] bg-white border border-[#DDDDDD] rounded-[10px] shadow-[0_4px_20px_rgba(0,0,0,0.10)] z-[100]">
+                <div className="absolute top-[calc(100%+6px)] left-0 w-[220px] max-w-[calc(100vw-32px)] bg-white border border-[#DDDDDD] rounded-[10px] shadow-[0_4px_20px_rgba(0,0,0,0.10)] z-[100]">
                   {/* 패널 내 검색창 */}
                   <div className="px-3 py-2.5 border-b border-[#F0F0F0]">
                     <input

@@ -24,9 +24,11 @@ const JobCard = ({ job, initialScrapId = null }: JobCardProps) => {
   const { scrapId, scrapLoading, handleScrap } = useScrap(job.id, initialScrapId);
 
   return (
-    <div className="bg-white rounded-lg border border-[#DDDDDD] p-5 hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-2">
-        <span className="text-[13px] text-[#888780]">{job.company}</span>
+    <div className="bg-white rounded-lg border border-[#DDDDDD] p-4 sm:p-5 hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start gap-3 mb-2">
+        <span className="text-[13px] text-[#888780] break-words">
+          {job.company}
+        </span>
         <button
           onClick={handleScrap}
           disabled={scrapLoading}
@@ -39,7 +41,7 @@ const JobCard = ({ job, initialScrapId = null }: JobCardProps) => {
         </button>
       </div>
 
-      <h3 className="text-[15px] font-semibold text-[#1A1A1A] mb-3 leading-snug">
+      <h3 className="text-[15px] font-semibold text-[#1A1A1A] mb-3 leading-snug break-words">
         {job.title}
       </h3>
 
