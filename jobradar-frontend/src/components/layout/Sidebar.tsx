@@ -53,7 +53,7 @@ const Sidebar = () => {
     : 1;
 
   return (
-    <aside className="w-[240px] flex-shrink-0 flex flex-col gap-5">
+    <aside className="hidden lg:flex w-[240px] flex-shrink-0 flex-col gap-5">
       {/* 인기 기술스택 — 가로 막대 그래프 + 브랜드 아이콘 */}
       <div className="bg-white rounded-lg border border-[#DDDDDD] p-4">
         <h4 className="text-[14px] font-semibold text-[#1A1A1A] mb-3">

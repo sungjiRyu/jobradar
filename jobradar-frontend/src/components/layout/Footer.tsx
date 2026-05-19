@@ -7,12 +7,12 @@ const Footer = () => {
   return (
     <>
       <footer className="w-full border-t border-[#DDDDDD] bg-white mt-auto py-5">
-        <div className="max-w-[1100px] mx-auto px-6 flex flex-col gap-1.5 text-[12px] text-[#888780]">
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex flex-col gap-1.5 text-[12px] text-[#888780]">
           <div className="flex justify-end">
-            <span className="ml-6 flex-shrink-0">sungjiryu220@gmail.com</span>
+            <span className="flex-shrink-0">sungjiryu220@gmail.com</span>
           </div>
 
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
             <span>© 2026 JobRadar. All rights reserved.</span>
             <div className="flex gap-3 flex-shrink-0">
               <button
