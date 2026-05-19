@@ -124,7 +124,7 @@ const MyPage = () => {
         </div>
 
         <section aria-label="스크랩 통계">
-          <ul className="grid grid-cols-4 gap-3">
+          <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "전체 스크랩", count: totalCount },
               { label: "지원예정",    count: pendingCount },
@@ -232,7 +232,7 @@ const MyPage = () => {
 
             {activeTab === "apply" && (
               <div className="flex flex-col gap-4">
-                <ul className="grid grid-cols-4 gap-3">
+                <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {(["PENDING", "APPLIED", "REVIEWING", "REJECTED"] as const).map((status) => (
                     <li
                       key={status}

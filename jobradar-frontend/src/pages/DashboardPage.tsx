@@ -413,7 +413,7 @@ const DashboardPage = () => {
 
   // ─── 메인 렌더링 ─────────────────────────────
   return (
-    <main className="min-h-screen bg-[#F5F5F5] py-8 px-6">
+    <main className="min-h-screen bg-[#F5F5F5] py-8 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
         {/* 페이지 헤더 */}
         <header className="mb-6">
@@ -536,7 +536,7 @@ const DashboardPage = () => {
                         <span className="flex-1 text-sm text-gray-600">
                           {e.experience}
                         </span>
-                        <div className="w-32 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className="hidden sm:block w-24 sm:w-32 bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
                             className="h-2 rounded-full"
                             style={{

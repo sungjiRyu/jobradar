@@ -274,7 +274,7 @@ const JobDetailPage = () => {
 
   if (error) {
     return (
-      <div className="max-w-[700px] mx-auto px-6 py-20 text-center">
+      <div className="max-w-[700px] mx-auto px-4 sm:px-6 py-20 text-center">
         <p className="text-[#E24B4A] text-[14px] mb-4">{error}</p>
         <button
           onClick={() => navigate("/")}
@@ -296,7 +296,7 @@ const JobDetailPage = () => {
   // ─────────────────────────────────────────────
 
   return (
-    <div className="max-w-[700px] mx-auto px-6 py-8">
+    <div className="max-w-[700px] mx-auto px-4 sm:px-6 py-8">
       {/* 뒤로가기 */}
       <button
         onClick={() => navigate(-1)}

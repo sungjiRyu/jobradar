@@ -131,14 +131,14 @@ const JobListPage = () => {
   }, [currentFilter, page, activeCard]);
 
   return (
-    <div className="max-w-[1100px] mx-auto px-6 py-6">
+    <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-6">
       {/* 검색 + 필터 */}
       <div className="mb-4">
         <SearchFilter onFilterChange={handleFilterChange} />
       </div>
 
-      {/* 오늘의 현황 카드 */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      {/* 오늘의 현황 카드 — 모바일: 2x2, lg+: 4x1 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
           { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]", card: "all" as const },
           { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]", card: "today" as const },
