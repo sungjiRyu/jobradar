@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,6 +55,12 @@ public class ScrapService {
         // 채용공고 조회
         Job job = jobRepository.findById(jobPostId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+
+        // 마감된 공고는 신규 스크랩 불가 — 기존 스크랩은 마이페이지에 그대로 노출됨
+        if (job.getStatus() == Job.JobStatus.CLOSED
+                || (job.getDeadline() != null && job.getDeadline().isBefore(LocalDate.now()))) {
+            throw new CustomException(ErrorCode.SCRAP_CLOSED_JOB);
+        }
 
         // 스크랩 생성 및 저장 (Builder 패턴 사용, 기본 상태 PENDING)
         Scrap scrap = Scrap.builder()

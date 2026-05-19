@@ -8,7 +8,9 @@ import lombok.Getter;
  * status:
  *   SUCCESS      - 텍스트 추출 성공
  *   IMAGE        - 이미지 공고 (텍스트 없음, img 태그 감지)
+ *   EXTERNAL     - 외부 사이트 공고 (알바몬·고용24)
  *   CRAWL_FAILED - 크롤링 실패 (네트워크 오류, 파싱 실패 등)
+ *   CLOSED       - 마감된 공고 (수집된 description 없음, 크롤링 안 함)
  */
 @Getter
 public class DescriptionResponse {
@@ -35,5 +37,9 @@ public class DescriptionResponse {
 
     public static DescriptionResponse external() {
         return new DescriptionResponse("EXTERNAL", null);
+    }
+
+    public static DescriptionResponse closed() {
+        return new DescriptionResponse("CLOSED", null);
     }
 }

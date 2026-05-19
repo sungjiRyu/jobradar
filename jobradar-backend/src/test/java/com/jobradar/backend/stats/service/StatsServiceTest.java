@@ -55,7 +55,7 @@ class StatsServiceTest {
                 new TechStackStatResponse("Java", 924L),
                 new TechStackStatResponse("Spring", 871L)
         );
-        given(statsRepository.findTechStackStats(eq(Job.JobStatus.ACTIVE), any(PageRequest.class)))
+        given(statsRepository.findTechStackStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(PageRequest.class)))
                 .willReturn(mockData);
 
         // when: 실제 서비스 메서드 호출
@@ -71,7 +71,7 @@ class StatsServiceTest {
     @DisplayName("기술스택 통계 - 공고 없을 때 빈 리스트 반환")
     void getTechStackStats_빈데이터() {
         // given
-        given(statsRepository.findTechStackStats(eq(Job.JobStatus.ACTIVE), any(PageRequest.class)))
+        given(statsRepository.findTechStackStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(PageRequest.class)))
                 .willReturn(Collections.emptyList());
 
         // when
@@ -91,7 +91,7 @@ class StatsServiceTest {
                 new LocationStatResponse("서울", 600L),
                 new LocationStatResponse("경기", 400L)
         );
-        given(statsRepository.findLocationStats(Job.JobStatus.ACTIVE)).willReturn(mockData);
+        given(statsRepository.findLocationStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(mockData);
 
         // when
         List<LocationStatResponse> result = statsService.getLocationStats();
@@ -105,7 +105,7 @@ class StatsServiceTest {
     @DisplayName("지역별 통계 - 공고 없을 때 빈 리스트 반환")
     void getLocationStats_빈데이터() {
         // given
-        given(statsRepository.findLocationStats(Job.JobStatus.ACTIVE)).willReturn(Collections.emptyList());
+        given(statsRepository.findLocationStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(Collections.emptyList());
 
         // when
         List<LocationStatResponse> result = statsService.getLocationStats();
@@ -120,10 +120,10 @@ class StatsServiceTest {
     @DisplayName("오늘의 현황 - 각 카운트가 올바르게 집계되는지 검증")
     void getTodayStats_정상조회() {
         // given
-        given(statsRepository.countByStatus(Job.JobStatus.ACTIVE)).willReturn(1284L);
-        given(statsRepository.countToday(eq(Job.JobStatus.ACTIVE), any(), any())).willReturn(47L);
+        given(statsRepository.countByStatus(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(1284L);
+        given(statsRepository.countToday(eq(Job.JobStatus.ACTIVE), any(), any(), any(LocalDate.class))).willReturn(47L);
         given(statsRepository.countUrgent(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(LocalDate.class))).willReturn(12L);
-        given(statsRepository.countJunior(Job.JobStatus.ACTIVE)).willReturn(312L);
+        given(statsRepository.countJunior(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(312L);
 
         // when
         TodayStatResponse result = statsService.getTodayStats();
@@ -145,7 +145,7 @@ class StatsServiceTest {
                 new ExperienceStatResponse("신입", 300L),
                 new ExperienceStatResponse("경력 1~3년", 500L)
         );
-        given(statsRepository.findExperienceStats(Job.JobStatus.ACTIVE)).willReturn(mockData);
+        given(statsRepository.findExperienceStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(mockData);
 
         // when
         List<ExperienceStatResponse> result = statsService.getExperienceStats();
@@ -159,7 +159,7 @@ class StatsServiceTest {
     @DisplayName("경력별 통계 - 공고 없을 때 빈 리스트 반환")
     void getExperienceStats_빈데이터() {
         // given
-        given(statsRepository.findExperienceStats(Job.JobStatus.ACTIVE)).willReturn(Collections.emptyList());
+        given(statsRepository.findExperienceStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(Collections.emptyList());
 
         // when
         List<ExperienceStatResponse> result = statsService.getExperienceStats();

@@ -30,6 +30,21 @@ public class JobSpecification {
     }
 
     /**
+     * 마감일이 지나지 않은 공고만 조회 — deadline >= today OR deadline IS NULL
+     * 스케줄러 타이밍에 의존하지 않도록 쿼리에서 직접 필터링하는 안전망
+     * deadline IS NULL은 상시채용/파싱 실패 공고 → 마감 판단 불가능하므로 포함
+     */
+    public static Specification<Job> deadlineNotPassed() {
+        return (root, query, cb) -> {
+            LocalDate today = LocalDate.now();
+            return cb.or(
+                    cb.isNull(root.get("deadline")),
+                    cb.greaterThanOrEqualTo(root.get("deadline"), today)
+            );
+        };
+    }
+
+    /**
      * 제목 또는 회사명에 keyword 포함 (대소문자 무시)
      * LIKE '%keyword%'
      */

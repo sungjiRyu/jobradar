@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -47,8 +48,9 @@ public class JobService {
                                     boolean todayOnly,
                                     boolean urgentOnly,
                                     Pageable pageable) {
-        // ACTIVE 조건은 항상 포함
-        Specification<Job> spec = JobSpecification.isActive();
+        // ACTIVE 상태 + 마감일 미경과 조건은 항상 포함
+        Specification<Job> spec = JobSpecification.isActive()
+                .and(JobSpecification.deadlineNotPassed());
 
         if (keyword != null && !keyword.isBlank()) {
             spec = spec.and(JobSpecification.hasKeyword(keyword));
@@ -99,6 +101,12 @@ public class JobService {
             };
         }
 
+        // 마감된 공고 + description 미수집 → 크롤링 안 함 (비용 절감)
+        // 이미 수집된 description은 위에서 status로 분기되어 반환됨
+        if (isClosed(job)) {
+            return DescriptionResponse.closed();
+        }
+
         // 기존 데이터(descriptionStatus = null) → lazy fetch 후 결과 저장
         // CRAWL_FAILED는 DB에 저장하지 않음 → null 유지 → 다음 방문 시 재시도
         DescriptionResponse result = fetchDescriptionBySourceSite(job);
@@ -121,6 +129,16 @@ public class JobService {
             case "잡코리아" -> jobkoreaCrawlerService.fetchDescription(job.getSourceUrl());
             default -> DescriptionResponse.crawlFailed();
         };
+    }
+
+    /**
+     * 마감된 공고인지 판단
+     * - status가 CLOSED이거나
+     * - deadline이 명시되어 있고 오늘보다 이전이면 마감으로 간주
+     */
+    private boolean isClosed(Job job) {
+        return job.getStatus() == Job.JobStatus.CLOSED
+                || (job.getDeadline() != null && job.getDeadline().isBefore(LocalDate.now()));
     }
 
     /** DescriptionResponse.status(문자열) → Job.DescriptionStatus enum 변환 (CRAWL_FAILED는 호출 전에 걸러야 함) */
@@ -229,6 +247,12 @@ public class JobService {
 
         if (job.getSummary() != null) {
             return SummaryResponse.success(job.getSummary());
+        }
+
+        // 마감된 공고 + 요약 미생성 → AI 호출 안 함 (비용 절감)
+        // 이미 생성된 요약은 위에서 반환됨
+        if (isClosed(job)) {
+            return SummaryResponse.closed();
         }
 
         // descriptionStatus 기반 분기
