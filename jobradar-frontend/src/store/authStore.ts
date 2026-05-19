@@ -20,7 +20,6 @@ const useAuthStore = create<AuthStore>((set) => ({
 
   login: (user: User, accessToken: string) => {
     localStorage.setItem("accessToken", accessToken);
-    // user 정보도 localStorage에 저장해야 새로고침 후 복원 가능
     localStorage.setItem("user", JSON.stringify(user));
     set({ user });
   },
