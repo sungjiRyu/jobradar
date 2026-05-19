@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 /**
  * LoginPage — 로그인 페이지 컴포넌트
  * 이메일/비밀번호 입력, 유효성 검사, API 연동까지 담당
  */
 const LoginPage = () => {
+  usePageTitle("로그인");
+
   // 이메일 입력값 상태 — onChange로 입력할 때마다 갱신
   const [email, setEmail] = useState("");
 

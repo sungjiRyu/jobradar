@@ -10,6 +10,7 @@ import type { Job } from "../components/job/JobCard";
 import { getStatsToday } from "../api/statsApi";
 import type { TodayStats } from "../api/statsApi";
 import { getScraps } from "../api/scrapApi";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 const INITIAL_FILTER: FilterState = {
   keyword: "",
@@ -21,6 +22,7 @@ const INITIAL_FILTER: FilterState = {
 };
 
 const JobListPage = () => {
+  usePageTitle("채용공고");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -32,9 +34,10 @@ const JobListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [currentFilter, setCurrentFilter] = useState<FilterState>(INITIAL_FILTER);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
-  const [activeCard, setActiveCard] = useState<"today" | "urgent" | "junior" | null>(null);
+  const [activeCard, setActiveCard] = useState<"all" | "today" | "urgent" | "junior" | null>(null);
   // jobPostId → scrapId 맵: 스크랩된 공고를 O(1)로 조회하기 위한 캐시
   const [scrapsMap, setScrapsMap] = useState<Record<number, number>>({});
 
@@ -59,8 +62,9 @@ const JobListPage = () => {
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
 
-  // 현황 카드 클릭 — 같은 카드 재클릭 시 해제
-  const handleCardClick = (card: "today" | "urgent" | "junior") => {
+  // 현황 카드 클릭 — 같은 카드 재클릭 시 해제, "all" 클릭 시 필터 초기화
+  const handleCardClick = (card: "all" | "today" | "urgent" | "junior") => {
+    if (card === "all") setCurrentFilter({ ...INITIAL_FILTER });
     setActiveCard(prev => prev === card ? null : card);
     setSearchParams(new URLSearchParams({ page: "1" }));
   };
@@ -114,6 +118,7 @@ const JobListPage = () => {
         const res = await getJobs(params);
         setJobs(res.data.data.content);
         setTotalPages(res.data.data.totalPages);
+        setTotalElements(res.data.data.totalElements);
       } catch (err) {
         console.error("공고 목록 조회 실패:", err);
         setError("공고 목록을 불러오는데 실패했습니다.");
@@ -135,16 +140,16 @@ const JobListPage = () => {
       {/* 오늘의 현황 카드 */}
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
-          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]", card: null },
+          { label: "전체 공고", value: todayStats?.totalCount, color: "text-[#1A1A1A]", card: "all" as const },
           { label: "오늘 신규", value: todayStats?.todayCount, color: "text-[#378ADD]", card: "today" as const },
           { label: "마감 임박", value: todayStats?.urgentCount, color: "text-[#E24B4A]", card: "urgent" as const },
           { label: "신입 공고", value: todayStats?.juniorCount, color: "text-[#1D9E75]", card: "junior" as const },
         ].map(item => (
           <div
             key={item.label}
-            onClick={() => item.card ? handleCardClick(item.card) : handleFilterChange({ ...INITIAL_FILTER })}
+            onClick={() => handleCardClick(item.card)}
             className={`rounded-[10px] border px-4 py-3 flex flex-col gap-0.5 cursor-pointer transition-all
-              ${activeCard === item.card && item.card !== null
+              ${activeCard === item.card
                 ? "bg-[#F0F7FF] border-[#378ADD] shadow-sm"
                 : "bg-white border-[#DDDDDD]"
               }`}
@@ -175,6 +180,9 @@ const JobListPage = () => {
 
           {!loading && !error && jobs.length > 0 && (
             <>
+              <div className="text-[13px] text-[#888780] mb-3">
+                검색 결과 <span className="font-semibold text-[#1A1A1A]">{totalElements.toLocaleString()}</span>개
+              </div>
               <div className="flex flex-col gap-4">
                 {jobs.map((job) => (
                   <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="cursor-pointer">

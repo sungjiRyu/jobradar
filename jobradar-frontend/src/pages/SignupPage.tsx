@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signup } from "../api/authApi";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 /**
  * SignupPage — 회원가입 페이지 컴포넌트
  * 입력값 상태 관리, 실시간 유효성 검사, API 연동, 완료 화면 전환 담당
  */
 const SignupPage = () => {
+  usePageTitle("회원가입");
+
   // 각 입력 필드 상태
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");

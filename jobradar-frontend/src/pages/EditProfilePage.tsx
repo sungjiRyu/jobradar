@@ -6,8 +6,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMe, updateNickname, updatePassword, withdrawUser } from "../api/userApi";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 const EditProfilePage = () => {
+  usePageTitle("정보 수정");
   const navigate = useNavigate();
 
   // 현재 닉네임 — API에서 불러와 표시

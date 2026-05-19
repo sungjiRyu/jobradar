@@ -14,13 +14,13 @@
 import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
-  CategoryScale,   // x축 카테고리 스케일 (막대 차트)
-  LinearScale,     // y축 숫자 스케일
-  BarElement,      // 막대 요소
-  ArcElement,      // 도넛/파이 요소
-  Title,           // 차트 제목 플러그인
-  Tooltip,         // 마우스 오버 툴팁 플러그인
-  Legend,          // 범례 플러그인
+  CategoryScale, // x축 카테고리 스케일 (막대 차트)
+  LinearScale, // y축 숫자 스케일
+  BarElement, // 막대 요소
+  ArcElement, // 도넛/파이 요소
+  Title, // 차트 제목 플러그인
+  Tooltip, // 마우스 오버 툴팁 플러그인
+  Legend, // 범례 플러그인
 } from "chart.js";
 import type { TooltipItem } from "chart.js"; // 툴팁 콜백 파라미터 타입 (타입 전용 import)
 import { Bar, Doughnut } from "react-chartjs-2";
@@ -41,6 +41,7 @@ import {
   mockLocationStats,
   mockExperienceStats,
 } from "../mocks/stats";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 // ─── 테스트용 플래그 ──────────────────────────────
 // true  → mock 데이터로 렌더링 (백엔드 없이 UI 확인)
@@ -61,14 +62,59 @@ ChartJS.register(
 );
 
 // ─────────────────────────────────────────────
-// 기술스택 이름에 따라 막대 색상을 결정하는 함수
+// 지역 차트(상위 10개) 그라데이션 — 1위가 가장 진함
 // ─────────────────────────────────────────────
-const getTechStackColor = (name: string): string => {
-  const n = name.toLowerCase();
-  if (n === "java" || n === "spring") return "#378ADD";        // 파란색
-  if (n === "react" || n === "python") return "#1D9E75";       // 초록색
-  if (n === "aws" || n === "docker") return "#7F77DD";         // 보라색
-  return "#D85A30";                                             // 나머지 주황색
+const BLUE_GRADIENT = [
+  "#185FA5",
+  "#2272BC",
+  "#2E82CC",
+  "#378ADD",
+  "#5099E1",
+  "#6BAAE6",
+  "#86BCEB",
+  "#A2CDF0",
+  "#BDDDF5",
+  "#D5E9F9",
+];
+
+// ─────────────────────────────────────────────
+// 기술스택별 고정 색상 매핑 — 자주 등장하는 스택은 일관된 색을 가짐
+// 매핑에 없는 스택은 TECH_STACK_FALLBACK 팔레트에서 index 순환으로 배정
+// ─────────────────────────────────────────────
+const TECH_STACK_COLOR_MAP: Record<string, string> = {
+  java: "#378ADD",
+  spring: "#2D6FBF",
+  python: "#1D9E75",
+  javascript: "#F5A623",
+  typescript: "#185FA5",
+  react: "#7F77DD",
+  vue: "#42B883",
+  node: "#1D7A3A",
+  "node.js": "#1D7A3A",
+  aws: "#D85A30",
+  docker: "#0DB7ED",
+  kubernetes: "#5A9FE3",
+  mysql: "#B8820A",
+  kotlin: "#A32D2D",
+  go: "#00ADD8",
+};
+
+const TECH_STACK_FALLBACK = [
+  "#378ADD",
+  "#1D9E75",
+  "#F5A623",
+  "#7F77DD",
+  "#D85A30",
+  "#2D6FBF",
+  "#B8820A",
+  "#A32D2D",
+];
+
+const getTechStackColor = (name: string, index: number): string => {
+  return (
+    TECH_STACK_COLOR_MAP[name.toLowerCase()] ??
+    TECH_STACK_FALLBACK[index % TECH_STACK_FALLBACK.length]
+  );
 };
 
 // ─────────────────────────────────────────────
@@ -77,8 +123,8 @@ const getTechStackColor = (name: string): string => {
 interface SummaryCardProps {
   label: string;
   value: number | null; // null이면 로딩 중
-  color: string;        // 텍스트/아이콘 강조색
-  bgColor: string;      // 카드 왼쪽 줄 색상
+  color: string; // 텍스트/아이콘 강조색
+  bgColor: string; // 카드 왼쪽 줄 색상
 }
 
 const SummaryCard = ({ label, value, color, bgColor }: SummaryCardProps) => (
@@ -108,6 +154,7 @@ const SummaryCard = ({ label, value, color, bgColor }: SummaryCardProps) => (
 // DashboardPage 메인 컴포넌트
 // ─────────────────────────────────────────────
 const DashboardPage = () => {
+  usePageTitle("채용공고 대시보드");
   // useState — 각 API 응답 데이터를 상태로 관리
   // null: 아직 데이터를 받지 못한 초기 상태 (로딩 스피너 판단에 사용)
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
@@ -155,7 +202,9 @@ const DashboardPage = () => {
         }
       } catch (err) {
         console.error("통계 데이터 로딩 실패:", err);
-        setError("데이터를 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.");
+        setError(
+          "데이터를 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.",
+        );
       } finally {
         // 성공/실패 여부와 관계없이 로딩 종료
         setLoading(false);
@@ -178,8 +227,8 @@ const DashboardPage = () => {
       {
         label: "공고 수",
         data: top8Stacks.map((s) => s.count),
-        // 각 막대 색상을 기술스택 이름에 따라 다르게 설정
-        backgroundColor: top8Stacks.map((s) => getTechStackColor(s.name)),
+        // 스택 이름별 고정 색 (매핑에 없으면 폴백 팔레트 순환)
+        backgroundColor: top8Stacks.map((s, i) => getTechStackColor(s.name, i)),
         // 막대 모서리 둥글게
         borderRadius: 6,
         borderSkipped: false, // 모든 모서리에 borderRadius 적용
@@ -188,7 +237,7 @@ const DashboardPage = () => {
   };
 
   const techChartOptions = {
-    responsive: true,          // 컨테이너 크기에 맞춰 자동 리사이즈
+    responsive: true, // 컨테이너 크기에 맞춰 자동 리사이즈
     maintainAspectRatio: false, // 높이를 CSS로 직접 제어하기 위해 false
     plugins: {
       legend: { display: false }, // 데이터셋이 1개이므로 범례 불필요
@@ -217,16 +266,21 @@ const DashboardPage = () => {
   };
 
   // ─── 지역별 가로 막대 차트 ────────────────────
-  // 전체 공고 수 합산 → 각 지역 비중(%) 계산에 사용
+  // 전체 공고 수 합산 → 각 지역 비중(%) 계산에 사용 (상위 10개의 비중도 전체 대비로 표시)
   const totalLocationCount = locations.reduce((sum, l) => sum + l.count, 0);
 
+  // 상위 10개만 추출 (count 내림차순)
+  const top10Locations = [...locations]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
   const locationChartData = {
-    labels: locations.map((l) => l.location),
+    labels: top10Locations.map((l) => l.location),
     datasets: [
       {
         label: "공고 수",
-        data: locations.map((l) => l.count),
-        backgroundColor: "#378ADD",
+        data: top10Locations.map((l) => l.count),
+        backgroundColor: top10Locations.map((_, i) => BLUE_GRADIENT[i]),
         borderRadius: 4,
         borderSkipped: false,
       },
@@ -361,40 +415,44 @@ const DashboardPage = () => {
   return (
     <main className="min-h-screen bg-[#F5F5F5] py-8 px-6">
       <div className="max-w-6xl mx-auto">
-
         {/* 페이지 헤더 */}
         <header className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">채용 대시보드</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            채용공고 대시보드
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
             현재 등록된 채용공고의 통계를 한눈에 확인하세요.
           </p>
         </header>
 
         {/* ── 상단 요약 카드 4개: 4열 그리드 ──────── */}
-        <section aria-label="요약 통계" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <section
+          aria-label="요약 통계"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+        >
           <SummaryCard
             label="전체 공고"
             value={todayStats?.totalCount ?? null}
-            color="#185FA5"
-            bgColor="#185FA5"
+            color="#1A1A1A"
+            bgColor="#1A1A1A"
           />
           <SummaryCard
             label="오늘 신규 공고"
             value={todayStats?.todayCount ?? null}
-            color="#1D7A3A"
-            bgColor="#1D7A3A"
+            color="#378ADD"
+            bgColor="#378ADD"
           />
           <SummaryCard
             label="마감 임박 (D-7)"
             value={todayStats?.urgentCount ?? null}
-            color="#B8820A"
-            bgColor="#B8820A"
+            color="#E24B4A"
+            bgColor="#E24B4A"
           />
           <SummaryCard
             label="신입 공고"
             value={todayStats?.juniorCount ?? null}
-            color="#7F77DD"
-            bgColor="#7F77DD"
+            color="#1D9E75"
+            bgColor="#1D9E75"
           />
         </section>
 
@@ -406,10 +464,15 @@ const DashboardPage = () => {
           {/* 기술스택 순위 막대 차트 */}
           <article className="bg-white border border-[#DDDDDD] rounded-xl p-5">
             <h2 className="text-base font-semibold text-gray-700 mb-4">
-              기술스택 순위 <span className="text-xs font-normal text-gray-400">(상위 8개)</span>
+              기술스택 순위{" "}
+              <span className="text-xs font-normal text-gray-400">
+                (상위 8개)
+              </span>
             </h2>
             {top8Stacks.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-10">데이터 없음</p>
+              <p className="text-sm text-gray-400 text-center py-10">
+                데이터 없음
+              </p>
             ) : (
               // 높이를 300px로 고정 — maintainAspectRatio: false이므로 CSS 높이가 실제 크기
               <div className="h-[300px]">
@@ -420,32 +483,20 @@ const DashboardPage = () => {
 
           {/* 지역별 채용 비중 가로 막대 차트 */}
           <article className="bg-white border border-[#DDDDDD] rounded-xl p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">지역별 채용 비중</h2>
-            {locations.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-10">데이터 없음</p>
+            <h2 className="text-base font-semibold text-gray-700 mb-4">
+              지역별 채용 비중{" "}
+              <span className="text-xs font-normal text-gray-400">
+                (상위 10개)
+              </span>
+            </h2>
+            {top10Locations.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-10">
+                데이터 없음
+              </p>
             ) : (
               <div className="h-[300px]">
                 <Bar data={locationChartData} options={locationChartOptions} />
               </div>
-            )}
-            {/* 비중(%) 목록 — 차트 아래에 텍스트로도 표시 */}
-            {locations.length > 0 && (
-              <ul className="mt-3 space-y-1">
-                {locations.slice(0, 5).map((l) => {
-                  const pct =
-                    totalLocationCount > 0
-                      ? ((l.count / totalLocationCount) * 100).toFixed(1)
-                      : "0.0";
-                  return (
-                    <li key={l.location} className="flex justify-between text-xs text-gray-500">
-                      <span>{l.location}</span>
-                      <span className="font-medium text-gray-700">
-                        {l.count.toLocaleString()}개 ({pct}%)
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
             )}
           </article>
         </section>
@@ -453,9 +504,13 @@ const DashboardPage = () => {
         {/* ── 경력별 공고 비중: 전체 너비 ──────────── */}
         <section aria-label="경력별 공고 비중" className="mb-4">
           <article className="bg-white border border-[#DDDDDD] rounded-xl p-5">
-            <h2 className="text-base font-semibold text-gray-700 mb-4">경력별 공고 비중</h2>
+            <h2 className="text-base font-semibold text-gray-700 mb-4">
+              경력별 공고 비중
+            </h2>
             {compressedExp.every((e) => e.count === 0) ? (
-              <p className="text-sm text-gray-400 text-center py-10">데이터 없음</p>
+              <p className="text-sm text-gray-400 text-center py-10">
+                데이터 없음
+              </p>
             ) : (
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="h-[260px] w-full md:w-[320px]">
@@ -463,19 +518,31 @@ const DashboardPage = () => {
                 </div>
                 <ul className="flex-1 space-y-3 w-full">
                   {compressedExp.map((e, i) => {
-                    const total = compressedExp.reduce((sum, x) => sum + x.count, 0);
-                    const pct = total > 0 ? ((e.count / total) * 100).toFixed(1) : "0.0";
+                    const total = compressedExp.reduce(
+                      (sum, x) => sum + x.count,
+                      0,
+                    );
+                    const pct =
+                      total > 0 ? ((e.count / total) * 100).toFixed(1) : "0.0";
                     return (
-                      <li key={e.experience} className="flex items-center gap-3">
+                      <li
+                        key={e.experience}
+                        className="flex items-center gap-3"
+                      >
                         <span
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: expColors[i] }}
                         />
-                        <span className="flex-1 text-sm text-gray-600">{e.experience}</span>
+                        <span className="flex-1 text-sm text-gray-600">
+                          {e.experience}
+                        </span>
                         <div className="w-32 bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
                             className="h-2 rounded-full"
-                            style={{ width: `${pct}%`, backgroundColor: expColors[i] }}
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: expColors[i],
+                            }}
                           />
                         </div>
                         <span className="text-sm font-medium text-gray-700 w-20 text-right">
@@ -489,7 +556,6 @@ const DashboardPage = () => {
             )}
           </article>
         </section>
-
       </div>
     </main>
   );
