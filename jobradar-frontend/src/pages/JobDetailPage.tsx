@@ -4,6 +4,7 @@ import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
 import { getScraps } from "../api/scrapApi";
 import { useScrap } from "../hooks/useScrap";
 import { usePageTitle } from "../hooks/usePageTitle";
+import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -32,7 +33,11 @@ interface JobSummaryJson {
   header: { summary: string };
   stacks: { core: string[]; infra: string[]; tools: string[] };
   details: { tasks: string[]; reqs: string[]; pref: string[] };
-  conditions: { type: string | null; location: string | null; salary: string | null } | null;
+  conditions: {
+    type: string | null;
+    location: string | null;
+    salary: string | null;
+  } | null;
   culture: string[];
   insight: { challenge: string | null; fit: string | null };
 }
@@ -49,7 +54,24 @@ const parseSummary = (raw: string): JobSummaryJson | null => {
   }
 };
 
-const Chip = ({ label, color = "blue" }: { label: string; color?: "blue" | "gray" | "purple" }) => {
+/**
+ * deadline(YYYY-MM-DD)이 오늘보다 이전인지 판단(T/F)
+ * (오늘 마감은 false)
+ */
+const isDeadlinePassed = (deadline: string | null | undefined): boolean => {
+  if (!deadline) return false;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return deadline < todayStr;
+};
+
+const Chip = ({
+  label,
+  color = "blue",
+}: {
+  label: string;
+  color?: "blue" | "gray" | "purple";
+}) => {
   const styles = {
     blue: "bg-blue-50 text-[#378ADD]",
     gray: "bg-gray-100 text-[#555]",
@@ -81,11 +103,17 @@ const JobDetailPage = () => {
   const [summary, setSummary] = useState<string | undefined>(undefined);
   // descStatus: DB에서 읽어온 상태 + lazy fetch 결과로 업데이트됨
   // null = 아직 fetch 안 됨(또는 크롤링 실패), "CRAWL_FAILED" = 이번 방문에서 크롤링 실패
-  const [descStatus, setDescStatus] = useState<"SUCCESS" | "IMAGE" | "EXTERNAL" | "CRAWL_FAILED" | null>(null);
+  const [descStatus, setDescStatus] = useState<
+    "SUCCESS" | "IMAGE" | "EXTERNAL" | "CRAWL_FAILED" | null
+  >(null);
   const [aiSummaryFailed, setAiSummaryFailed] = useState(false); // AI 요약만 실패한 경우
-  const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(
+    null,
+  );
 
-  const { scrapId, setScrapId, scrapLoading, handleScrap } = useScrap(job?.id ?? null);
+  const { scrapId, setScrapId, scrapLoading, handleScrap } = useScrap(
+    job?.id ?? null,
+  );
 
   // ── 점(dots) 애니메이션 ───────────────────────
   const [dots, setDots] = useState("");
@@ -93,7 +121,7 @@ const JobDetailPage = () => {
 
   const startDots = () => {
     dotsIntervalRef.current = setInterval(() => {
-      setDots(prev => prev.length >= 3 ? "" : prev + ".");
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
     }, 500);
   };
 
@@ -189,6 +217,12 @@ const JobDetailPage = () => {
           return;
         }
 
+        // 마감된 공고 + 요약 미생성 → 크롤링/AI 호출 안 함 (비용 절감)
+        // 마감 안내는 별도 렌더링 분기에서 처리
+        const closed =
+          jobData.status === "CLOSED" || isDeadlinePassed(jobData.deadline);
+        if (closed) return;
+
         const status = jobData.descriptionStatus;
         setDescStatus(status);
 
@@ -211,12 +245,15 @@ const JobDetailPage = () => {
     // 로그인 상태면 스크랩 여부 확인
     const token = localStorage.getItem("accessToken");
     if (token) {
-      getScraps().then((res) => {
-        const found = res.data.data.find(
-          (s: { jobPostId: number; scrapId: number }) => s.jobPostId === Number(id)
-        );
-        if (found) setScrapId(found.scrapId);
-      }).catch(() => {});
+      getScraps()
+        .then((res) => {
+          const found = res.data.data.find(
+            (s: { jobPostId: number; scrapId: number }) =>
+              s.jobPostId === Number(id),
+          );
+          if (found) setScrapId(found.scrapId);
+        })
+        .catch(() => {});
     }
 
     fetchJob();
@@ -251,13 +288,15 @@ const JobDetailPage = () => {
 
   if (!job) return null;
 
+  // 마감 여부 — status가 CLOSED이거나 deadline이 오늘 이전이면 마감으로 간주
+  const isClosed = job.status === "CLOSED" || isDeadlinePassed(job.deadline);
+
   // ─────────────────────────────────────────────
   // 렌더링
   // ─────────────────────────────────────────────
 
   return (
     <div className="max-w-[700px] mx-auto px-6 py-8">
-
       {/* 뒤로가기 */}
       <button
         onClick={() => navigate(-1)}
@@ -273,10 +312,26 @@ const JobDetailPage = () => {
           <div className="flex items-center gap-3">
             <span className="text-[12px] text-[#888780]">{job.sourceSite}</span>
             <button
-              onClick={handleScrap}
+              onClick={(e) => {
+                // 마감된 공고에 신규 스크랩 시도 → 토스트로 안내, 기존 스크랩은 정상 동작
+                if (isClosed && scrapId === null) {
+                  e.stopPropagation();
+                  toast("마감된 공고는 스크랩할 수 없습니다", {
+                    icon: (
+                      <div className="w-4 h-4 bg-[#E24B4A] rounded-full flex items-center justify-center text-white text-[10px] font-bold leading-none">
+                        !
+                      </div>
+                    ),
+                  });
+                  return;
+                }
+                handleScrap();
+              }}
               disabled={scrapLoading}
               className={`transition-colors text-lg leading-none ${
-                scrapId !== null ? "text-red-400" : "text-[#DDDDDD] hover:text-red-400"
+                scrapId !== null
+                  ? "text-red-400"
+                  : "text-[#DDDDDD] hover:text-red-400"
               }`}
               title={scrapId !== null ? "스크랩 취소" : "스크랩"}
             >
@@ -314,39 +369,59 @@ const JobDetailPage = () => {
         </div>
       </div>
 
-      {/* ── AI 요약 영역 ── */}
-
-      {/* 1) 로딩 중: 스켈레톤 UI */}
-      {summary === undefined && !aiSummaryFailed
-        && descStatus !== "IMAGE" && descStatus !== "EXTERNAL" && descStatus !== "CRAWL_FAILED" && (
-        <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-            <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
-            <div className="h-3 w-4/5 bg-gray-100 rounded animate-pulse" />
-            <div className="h-3 w-3/5 bg-gray-100 rounded animate-pulse" />
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
-            <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
-            <div className="h-3 w-5/6 bg-gray-100 rounded animate-pulse" />
-            <div className="h-3 w-4/6 bg-gray-100 rounded animate-pulse" />
-          </div>
-          <p className="text-[12px] text-[#AAAAAA] text-center mt-4">
-            {loadingStatus === "crawling"
-              ? `채용공고 정보를 가져오는 중입니다${dots}`
-              : `AI가 공고 정보를 정리하고 있습니다${dots}`}
+      {/* ── 마감 공고 안내 ── */}
+      {isClosed && (
+        <div className="bg-[#FCEBEB] border border-[#F5C6C6] rounded-lg p-4 mb-6 text-center">
+          <p className="text-[14px] font-medium text-[#A32D2D] mb-1">
+            마감된 공고입니다
           </p>
+          {job.deadline && (
+            <p className="text-[12px] text-[#A32D2D]/80">
+              마감일: {job.deadline}
+            </p>
+          )}
         </div>
       )}
+
+      {/* ── AI 요약 영역 — 마감 공고는 API 호출 안 함 ── */}
+
+      {/* 1) 로딩 중: 스켈레톤 UI (마감 공고는 표시 안 함) */}
+      {!isClosed &&
+        summary === undefined &&
+        !aiSummaryFailed &&
+        descStatus !== "IMAGE" &&
+        descStatus !== "EXTERNAL" &&
+        descStatus !== "CRAWL_FAILED" && (
+          <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
+              <div className="h-3 w-4/5 bg-gray-100 rounded animate-pulse" />
+              <div className="h-3 w-3/5 bg-gray-100 rounded animate-pulse" />
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-3 w-full bg-gray-100 rounded animate-pulse" />
+              <div className="h-3 w-5/6 bg-gray-100 rounded animate-pulse" />
+              <div className="h-3 w-4/6 bg-gray-100 rounded animate-pulse" />
+            </div>
+            <p className="text-[12px] text-[#AAAAAA] text-center mt-4">
+              {loadingStatus === "crawling"
+                ? `채용공고 정보를 가져오는 중입니다${dots}`
+                : `AI가 공고 정보를 정리하고 있습니다${dots}`}
+            </p>
+          </div>
+        )}
 
       {/* 2) AI 요약 실패: 재시도 버튼 */}
       {aiSummaryFailed && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
-          <p className="text-[13px] text-[#888780] mb-3">상세 내용을 불러오지 못했습니다.</p>
+          <p className="text-[13px] text-[#888780] mb-3">
+            상세 내용을 불러오지 못했습니다.
+          </p>
           <button
             onClick={retryAiSummary}
             className="text-[13px] text-[#378ADD] hover:underline"
@@ -359,15 +434,21 @@ const JobDetailPage = () => {
       {/* 3) 크롤링 실패: 원본 링크 안내 */}
       {descStatus === "CRAWL_FAILED" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
-          <p className="text-[13px] text-[#888780] mb-1">공고 정보를 가져오는데 실패했습니다.</p>
-          <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
+          <p className="text-[13px] text-[#888780] mb-1">
+            공고 정보를 가져오는데 실패했습니다.
+          </p>
+          <p className="text-[13px] text-[#888780]">
+            상세 내용은 원본 공고에서 확인하세요.
+          </p>
         </div>
       )}
 
       {/* 4) 외부 공고: 알바몬·고용24 등 → 원본 링크 버튼 */}
       {descStatus === "EXTERNAL" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
-          <p className="text-[13px] text-[#888780] mb-3">이 공고는 외부 사이트에서 확인할 수 있습니다.</p>
+          <p className="text-[13px] text-[#888780] mb-3">
+            이 공고는 외부 사이트에서 확인할 수 있습니다.
+          </p>
           <a
             href={job.sourceUrl}
             target="_blank"
@@ -382,148 +463,226 @@ const JobDetailPage = () => {
       {/* 5) 이미지 공고: 텍스트 추출 불가 */}
       {descStatus === "IMAGE" && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
-          <p className="text-[13px] text-[#888780] mb-1">이미지 형식의 공고입니다.</p>
-          <p className="text-[13px] text-[#888780]">상세 내용은 원본 공고에서 확인하세요.</p>
+          <p className="text-[13px] text-[#888780] mb-1">
+            이미지 형식의 공고입니다.
+          </p>
+          <p className="text-[13px] text-[#888780]">
+            상세 내용은 원본 공고에서 확인하세요.
+          </p>
         </div>
       )}
 
       {/* 6) 요약 성공: JSON 파싱 후 섹션별 렌더링 */}
-      {summary && (() => {
-        const data = parseSummary(summary);
-        if (!data) return null;
-        return (
-          <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-semibold text-[#1A1A1A]">상세 내용</h2>
-              <span className="flex items-center gap-1 text-[11px] text-[#888780]">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="gemini-grad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#4285F4" />
-                      <stop offset="100%" stopColor="#9C27B0" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M12 2C12 2 13.5 8.5 22 12C13.5 15.5 12 22 12 22C12 22 10.5 15.5 2 12C10.5 8.5 12 2Z" fill="url(#gemini-grad)" />
-                </svg>
-                AI로 정리한 내용입니다
-              </span>
-            </div>
-
-            {data.header?.summary && (
-              <p className="text-[14px] text-[#378ADD] font-medium mb-4 pb-4 border-b border-[#DDDDDD]">
-                "{data.header.summary}"
-              </p>
-            )}
-
-            {(data.stacks?.core?.length > 0 || data.stacks?.infra?.length > 0 || data.stacks?.tools?.length > 0) && (
-              <div className="mb-4">
-                <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">🛠 기술스택</p>
-                <div className="space-y-1.5">
-                  {data.stacks.core?.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-[#888780] w-10">Core</span>
-                      {data.stacks.core.map((s) => <Chip key={s} label={s} color="blue" />)}
-                    </div>
-                  )}
-                  {data.stacks.infra?.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-[#888780] w-10">Infra</span>
-                      {data.stacks.infra.map((s) => <Chip key={s} label={s} color="gray" />)}
-                    </div>
-                  )}
-                  {data.stacks.tools?.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-[#888780] w-10">Tools</span>
-                      {data.stacks.tools.map((s) => <Chip key={s} label={s} color="purple" />)}
-                    </div>
-                  )}
-                </div>
+      {summary &&
+        (() => {
+          const data = parseSummary(summary);
+          if (!data) return null;
+          return (
+            <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[16px] font-semibold text-[#1A1A1A]">
+                  상세 내용
+                </h2>
+                <span className="flex items-center gap-1 text-[11px] text-[#888780]">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <defs>
+                      <linearGradient
+                        id="gemini-grad"
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor="#4285F4" />
+                        <stop offset="100%" stopColor="#9C27B0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M12 2C12 2 13.5 8.5 22 12C13.5 15.5 12 22 12 22C12 22 10.5 15.5 2 12C10.5 8.5 12 2Z"
+                      fill="url(#gemini-grad)"
+                    />
+                  </svg>
+                  AI로 정리한 내용입니다
+                </span>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 gap-3 mb-4">
-              {data.details?.tasks?.length > 0 && (
-                <div>
-                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">📋 주요업무</p>
-                  <ul className="space-y-1">
-                    {data.details.tasks.map((t, i) => (
-                      <li key={i} className="text-[13px] text-[#444] flex gap-1.5">
-                        <span className="text-[#888780] mt-0.5">•</span>{t}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {data.header?.summary && (
+                <p className="text-[14px] text-[#378ADD] font-medium mb-4 pb-4 border-b border-[#DDDDDD]">
+                  "{data.header.summary}"
+                </p>
               )}
-              {data.details?.reqs?.length > 0 && (
-                <div>
-                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">✅ 자격요건</p>
-                  <ul className="space-y-1">
-                    {data.details.reqs.map((r, i) => (
-                      <li key={i} className="text-[13px] text-[#444] flex gap-1.5">
-                        <span className="text-[#888780] mt-0.5">•</span>{r}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {data.details?.pref?.length > 0 && (
-                <div>
-                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">⭐ 우대사항</p>
-                  <ul className="space-y-1">
-                    {data.details.pref.map((p, i) => (
-                      <li key={i} className="text-[13px] text-[#444] flex gap-1.5">
-                        <span className="text-[#888780] mt-0.5">•</span>{p}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
 
-            {data.conditions && (data.conditions.type || data.conditions.location || data.conditions.salary) && (
-              <div className="mb-4">
-                <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">🏠 근무조건</p>
-                <div className="flex flex-wrap gap-4 text-[13px] text-[#444]">
-                  {data.conditions.type && (
-                    <span><span className="text-[#888780]">형태  </span>{data.conditions.type}</span>
-                  )}
-                  {data.conditions.location && (
-                    <span><span className="text-[#888780]">지역  </span>{data.conditions.location}</span>
-                  )}
-                  {data.conditions.salary && (
-                    <span><span className="text-[#888780]">급여  </span>{data.conditions.salary}</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {data.culture?.length > 0 && (
-              <div className="mb-4">
-                <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">🏢 조직문화</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.culture.map((c) => <Chip key={c} label={c} color="gray" />)}
-                </div>
-              </div>
-            )}
-
-            {(data.insight?.challenge || data.insight?.fit) && (
-              <div className="bg-[#F8F9FA] rounded-lg p-4">
-                <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">💡 인사이트</p>
-                {data.insight.challenge && (
-                  <p className="text-[12px] text-[#555] mb-1">
-                    <span className="text-[#888780]">기술 도전 </span>{data.insight.challenge}
+              {(data.stacks?.core?.length > 0 ||
+                data.stacks?.infra?.length > 0 ||
+                data.stacks?.tools?.length > 0) && (
+                <div className="mb-4">
+                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">
+                    🛠 기술스택
                   </p>
+                  <div className="space-y-1.5">
+                    {data.stacks.core?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-[#888780] w-10">
+                          Core
+                        </span>
+                        {data.stacks.core.map((s) => (
+                          <Chip key={s} label={s} color="blue" />
+                        ))}
+                      </div>
+                    )}
+                    {data.stacks.infra?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-[#888780] w-10">
+                          Infra
+                        </span>
+                        {data.stacks.infra.map((s) => (
+                          <Chip key={s} label={s} color="gray" />
+                        ))}
+                      </div>
+                    )}
+                    {data.stacks.tools?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-[#888780] w-10">
+                          Tools
+                        </span>
+                        {data.stacks.tools.map((s) => (
+                          <Chip key={s} label={s} color="purple" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 mb-4">
+                {data.details?.tasks?.length > 0 && (
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">
+                      📋 주요업무
+                    </p>
+                    <ul className="space-y-1">
+                      {data.details.tasks.map((t, i) => (
+                        <li
+                          key={i}
+                          className="text-[13px] text-[#444] flex gap-1.5"
+                        >
+                          <span className="text-[#888780] mt-0.5">•</span>
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                {data.insight.fit && (
-                  <p className="text-[12px] text-[#555]">
-                    <span className="text-[#888780]">적합한 개발자 </span>{data.insight.fit}
-                  </p>
+                {data.details?.reqs?.length > 0 && (
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">
+                      ✅ 자격요건
+                    </p>
+                    <ul className="space-y-1">
+                      {data.details.reqs.map((r, i) => (
+                        <li
+                          key={i}
+                          className="text-[13px] text-[#444] flex gap-1.5"
+                        >
+                          <span className="text-[#888780] mt-0.5">•</span>
+                          {r}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {data.details?.pref?.length > 0 && (
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#1A1A1A] mb-1.5">
+                      ⭐ 우대사항
+                    </p>
+                    <ul className="space-y-1">
+                      {data.details.pref.map((p, i) => (
+                        <li
+                          key={i}
+                          className="text-[13px] text-[#444] flex gap-1.5"
+                        >
+                          <span className="text-[#888780] mt-0.5">•</span>
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        );
-      })()}
+
+              {data.conditions &&
+                (data.conditions.type ||
+                  data.conditions.location ||
+                  data.conditions.salary) && (
+                  <div className="mb-4">
+                    <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">
+                      🏠 근무조건
+                    </p>
+                    <div className="flex flex-wrap gap-4 text-[13px] text-[#444]">
+                      {data.conditions.type && (
+                        <span>
+                          <span className="text-[#888780]">형태 </span>
+                          {data.conditions.type}
+                        </span>
+                      )}
+                      {data.conditions.location && (
+                        <span>
+                          <span className="text-[#888780]">지역 </span>
+                          {data.conditions.location}
+                        </span>
+                      )}
+                      {data.conditions.salary && (
+                        <span>
+                          <span className="text-[#888780]">급여 </span>
+                          {data.conditions.salary}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {data.culture?.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">
+                    🏢 조직문화
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {data.culture.map((c) => (
+                      <Chip key={c} label={c} color="gray" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(data.insight?.challenge || data.insight?.fit) && (
+                <div className="bg-[#F8F9FA] rounded-lg p-4">
+                  <p className="text-[13px] font-semibold text-[#1A1A1A] mb-2">
+                    💡 인사이트
+                  </p>
+                  {data.insight.challenge && (
+                    <p className="text-[12px] text-[#555] mb-1">
+                      <span className="text-[#888780]">기술 도전 </span>
+                      {data.insight.challenge}
+                    </p>
+                  )}
+                  {data.insight.fit && (
+                    <p className="text-[12px] text-[#555]">
+                      <span className="text-[#888780]">적합한 개발자 </span>
+                      {data.insight.fit}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {/* ── 지원하기 버튼 ── */}
       <a
