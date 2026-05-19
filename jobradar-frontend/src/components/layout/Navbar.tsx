@@ -14,12 +14,13 @@ const Navbar = () => {
   return (
     <nav className="w-full h-14 bg-white border-b border-[#DDDDDD] flex items-center px-6">
       {/* 로고 */}
-      <span
-        className="text-[#378ADD] font-bold text-lg cursor-pointer"
+      <div
+        className="flex items-center gap-2 cursor-pointer"
         onClick={() => navigate("/")}
       >
-        JobRadar
-      </span>
+        <img src="/favicon.svg" alt="JobRadar" className="w-7 h-7" />
+        <span className="text-[#378ADD] font-bold text-lg">JobRadar</span>
+      </div>
 
       {/* 가운데 네비게이션 링크 */}
       <div className="ml-8 flex items-center gap-1">
