@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getJobById, getJobDescription, getJobSummary } from "../api/jobApi";
 import { getScraps } from "../api/scrapApi";
 import { useScrap } from "../hooks/useScrap";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -73,6 +74,8 @@ const JobDetailPage = () => {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  usePageTitle(job ? job.title : "공고 상세");
 
   // ── AI 요약 상태 ─────────────────────────────
   const [summary, setSummary] = useState<string | undefined>(undefined);

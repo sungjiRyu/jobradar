@@ -7,8 +7,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { verifyPassword } from "../api/authApi";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 const VerifyPasswordPage = () => {
+  usePageTitle("비밀번호 확인");
   const navigate = useNavigate();
 
   // 현재 비밀번호 입력값 상태

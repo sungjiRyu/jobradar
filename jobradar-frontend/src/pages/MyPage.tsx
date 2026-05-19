@@ -4,6 +4,7 @@ import { getMe } from "../api/userApi";
 import { getScraps, updateScrapStatus, deleteScrap } from "../api/scrapApi";
 import type { ScrapStatus } from "../api/scrapApi";
 import { calcDday } from "../utils/dateUtils";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 interface UserInfo {
   email: string;
@@ -35,6 +36,7 @@ const statusLabel: Record<ScrapStatus, string> = {
 };
 
 const MyPage = () => {
+  usePageTitle("마이페이지");
   const navigate = useNavigate();
 
   const [user, setUser] = useState<UserInfo | null>(null);
