@@ -4,17 +4,17 @@ import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 크롤링 수동 실행 컨트롤러 (개발/테스트 전용)
+ * 크롤링 수동 실행 컨트롤러 (관리 기능)
  *
- * [주의] 배포 전 반드시 삭제하거나 관리자 권한으로 제한할 것
- * - 현재: SecurityConfig에서 /api/admin/** 는 로그인한 사용자만 접근 가능
- * - 운영 환경: ADMIN 롤을 가진 계정만 호출 가능하도록 hasRole("ADMIN") 추가 권장
- *
+ * [권한]
+ * SecurityConfig에서 /api/admin/** → hasRole("ADMIN")로 1차 제한 +
+ * 각 메서드에 @PreAuthorize("hasRole('ADMIN')")로 2차 제한 (defense in depth)
  */
 @Slf4j
 @RestController
@@ -31,11 +31,10 @@ public class CrawlerController {
      *
      * - 크롤링 1 사이클은 수 분~수십 분 소요되므로 @Async로 분리
      * - 진행 상황은 서버 로그에서 확인 (===== 채용공고 수집 스케줄러 시작 ===== 등)
-     * [인증 필요]
-     * SecurityConfig에서 /api/admin/** → authenticated() 설정
-     * Authorization: Bearer {accessToken} 헤더 필요
+     * - ADMIN 권한 필수
      */
     @PostMapping("/crawl")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> crawlNow() {
         log.info("수동 크롤링 요청 수신 - 비동기 실행 시작");
         crawlerScheduler.runCrawlAsync();
@@ -50,8 +49,10 @@ public class CrawlerController {
      * - @Async로 백그라운드 실행 → 즉시 202 Accepted 반환
      * - 진행 상황은 서버 로그에서 확인 ([backfill] N/M 처리됨)
      * - 외부 사이트 부하를 줄이기 위해 공고당 1초 sleep
+     * - ADMIN 권한 필수
      */
     @PostMapping("/backfill-descriptions")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> backfillDescriptions() {
         log.info("description 백필 요청 수신");
         jobService.backfillDescriptions();
