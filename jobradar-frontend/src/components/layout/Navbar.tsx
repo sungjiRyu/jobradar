@@ -58,7 +58,7 @@ const Navbar = () => {
               : "text-[#888780] hover:text-[#1A1A1A]"
           }`}
         >
-          대시보드
+          채용 트렌드
         </button>
       </div>
 
@@ -122,7 +122,7 @@ const Navbar = () => {
             onClick={() => navigate("/dashboard")}
             className={mobileItemClass(isActive("/dashboard"))}
           >
-            대시보드
+            채용 트렌드
           </button>
           {user ? (
             <>
