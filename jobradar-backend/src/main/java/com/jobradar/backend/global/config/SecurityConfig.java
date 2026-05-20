@@ -4,6 +4,7 @@ import com.jobradar.backend.global.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -28,6 +29,7 @@ import java.util.List;
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity   // 컨트롤러의 @PreAuthorize 사용을 위해 활성화
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -36,7 +38,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // CSRF 비활성화: REST API는 세션 없이 토큰 방식으로 동작하므로 불필요
+            // CSRF 비활성화
             .csrf(AbstractHttpConfigurer::disable)
 
             // CORS 설정 적용
@@ -49,17 +51,16 @@ public class SecurityConfig {
             // URL별 접근 권한 설정
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(
-                            "/api/auth/**",          // 로그인, 토큰 갱신, 로그아웃
-                            "/api/users/signup",     // 회원가입
-                            "/api/jobs/**",          // 채용공고 조회 (비로그인도 가능)
-                            "/api/tech-stacks/**",   // 기술스택 목록 조회 (비로그인도 가능)
-                            "/api/stats/**",         // 대시보드 통계 (비로그인도 가능)
-                            "/swagger-ui/**",        // Swagger UI
-                            "/v3/api-docs/**"        // Swagger API 문서
+                            "/api/auth/**",  // 로그인, 토큰 갱신, 로그아웃
+                            "/api/users/signup",         // 회원가입
+                            "/api/jobs/**",              // 채용공고 조회 (비로그인도 가능)
+                            "/api/tech-stacks/**",       // 기술스택 목록 조회 (비로그인도 가능)
+                            "/api/stats/**",             // 대시보드 통계 (비로그인도 가능)
+                            "/swagger-ui/**",            // Swagger UI
+                            "/v3/api-docs/**"            // Swagger API 문서
                     ).permitAll()
-                    // /api/admin/**는 로그인한 사용자만 접근 가능 (수동 크롤링 등 관리 기능)
-                    // 운영 환경에서는 .hasRole("ADMIN")으로 더 엄격히 제한 권장
-                    .requestMatchers("/api/admin/**").authenticated()
+                    // /api/admin/** — ADMIN 권한 보유자만 접근 가능
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()  // 그 외 모든 요청은 로그인 필요
             )
 
