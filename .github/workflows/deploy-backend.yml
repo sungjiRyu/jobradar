@@ -16,6 +16,10 @@ jobs:
           java-version: '21'
           distribution: 'corretto'
 
+      - name: Test
+        run: ./gradlew test
+        working-directory: jobradar-backend
+
       - name: Build
         run: ./gradlew build -x test
         working-directory: jobradar-backend
