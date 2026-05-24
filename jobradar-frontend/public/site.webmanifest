@@ -1,0 +1,23 @@
+{
+  "name": "JobRadar",
+  "short_name": "JobRadar",
+  "description": "개발자 취업준비생을 위한 채용공고 통합 검색 및 분석 대시보드",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#378ADD",
+  "background_color": "#F5F5F5",
+  "display": "standalone",
+  "start_url": "/"
+}
