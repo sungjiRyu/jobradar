@@ -118,8 +118,6 @@ AccessToken은 짧게 유지하고 RefreshToken을 Redis에 저장하는 하이�
 
 
 
-
-
 **선택 이유**
 공식 API가 있는 곳은 API를 우선 사용 (안정성, 법적 안전성).
 공식 API가 없는 곳은 robots.txt 준수 + 요청 간격 1초 + User-Agent 설정으로 윤리적 크롤링.
@@ -224,84 +222,131 @@ SSR/CSR의 차이와 크롤링 가능 여부 판단 방법을 익혔습니다.
 Selenium 대신 Jsoup을 선택한 것은 EC2 t2.micro 메모리 제약 때문이었는데,
 브라우저를 띄우지 않는 가벼운 방식의 트레이드오프를 이해하게 되었습니다.
 
-<br>
+---
 
-### 2. JWT subject에 userId 노출 문제
+### 2. N+1 문제 → JOIN FETCH로 쿼리 최적화
 
 **문제**
-초기 구현 시 JWT의 subject로 DB의 `userId` (PK)를 사용했습니다.
-JWT는 디코딩만 하면 누구나 내용을 볼 수 있어서 DB PK가 외부에 노출됩니다.
+스크랩 목록 조회 시 `show-sql` 로그에서 SQL이 N+1번 출력됨을 발견했습니다.
+스크랩 100개를 조회하면 Job SELECT 쿼리가 100번 추가 발생했습니다.
 
 **원인**
-JWT는 암호화가 아닌 서명(Signature)만 검증합니다.
-Base64로 인코딩되어 있어 누구나 디코딩 가능합니다.
+`Scrap.job` 필드가 `FetchType.LAZY`로 설정되어 있어
+루프에서 `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
 
 **해결**
-- JWT subject를 `userId` → `email`로 변경
-- 모든 Controller에서 `@AuthenticationPrincipal String email` 사용
-- Redis 키도 `refresh:{userId}` → `refresh:{email}`로 변경
+```java
+@Query("SELECT s FROM Scrap s JOIN FETCH s.job WHERE s.user.email = :email")
+List<Scrap> findAllByUserEmailWithJob(@Param("email") String email);
+```
+쿼리 N+1번 → 1번으로 감소했습니다.
 
 **배운 점**
-JWT의 보안 원리(서명 vs 암호화)를 정확히 이해하게 되었습니다.
+JPA의 지연 로딩(LAZY) 전략이 루프 내에서 어떻게 N+1 문제를 유발하는지 이해했습니다.
+`show-sql` 로그로 실제 쿼리 발생 횟수를 확인하는 습관을 갖게 되었습니다.
 
-<br>
+---
 
-
-
-
-
-
-### 3. Hibernate 7과 MySQL Dialect 호환성
+### 3. 동시 요청 시 중복 크롤링 — 비관적 락으로 해결
 
 **문제**
-Spring Boot 4.0 업그레이드 후 빌드 실패.
-`MySQL8Dialect` 클래스를 찾을 수 없다는 에러가 발생했습니다.
+미수집 공고를 여러 사용자가 동시에 열면 외부 사이트에 N번 중복 HTTP 요청이 발생해
+IP 차단 위험이 있었습니다.
 
 **원인**
-Hibernate 7부터 `MySQL8Dialect`가 제거되고 `MySQLDialect`로 통합되었습니다.
-
-
-
+모든 요청이 `descriptionStatus = null`을 동시에 읽고
+각자 fetch를 진행하는 레이스 컨디션이 발생했습니다.
 
 **해결**
-`application.yml`에서 dialect 설정을 변경하고,
-Spring Boot가 자동으로 적절한 dialect를 선택하도록 변경.
+Check → Lock → Check 패턴을 적용했습니다.
+첫 번째 요청만 실제 fetch를 수행하고 나머지는 락 대기 후 저장된 결과를 반환합니다.
 
-```yaml
-# Before
-spring.jpa.database-platform: org.hibernate.dialect.MySQL8Dialect
+```java
+// 1차 확인 (락 없이)
+if (job.getDescriptionStatus() != null) return cached;
 
-# After (자동 선택)
-# 명시하지 않음
+// 비관적 락으로 재조회 → 동시 요청 직렬화
+job = jobRepository.findByIdForUpdate(jobId);
 
+// 2차 확인 (락 획득 후) → 대기 중 다른 트랜잭션이 저장했을 수 있음
+if (job.getDescriptionStatus() != null) return cached;
 
-
+// 실제 fetch
 ```
 
 **배운 점**
-프레임워크 메이저 업그레이드 시 deprecated API 확인의 중요성.
+동시성 문제에서 단순 중복 체크만으로는 레이스 컨디션을 막을 수 없음을 이해했습니다.
+비관적 락(Pessimistic Lock)과 Double-Checked Locking 패턴의 필요성을 직접 경험했습니다.
 
-<br>
+---
 
-
-
-### 4. MySQL 테이블명 변경 시 FK 제약
+### 4. 상시채용 공고 마감 처리 — DeadlineType 컬럼 설계
 
 **문제**
-`Job` 엔티티의 테이블명을 `jobs`에서 `job_posts`로 변경했는데
-JPA `ddl-auto: update` 설정으로 `jobs` 테이블이 삭제되지 않고 남아있었습니다.
-DROP TABLE 시도 시 `scraps.job_id` FK 제약으로 실패.
+`deadline = NULL`인 상시채용 공고는 사이트에서 내려가도
+마감일 기반 스케줄러가 감지하지 못해 삭제된 공고가 계속 노출됐습니다.
+
+**원인**
+기존 설계가 마감일(날짜) 유무만으로 공고 상태를 판단했습니다.
+NULL은 처리할 수 없는 구조였습니다.
 
 **해결**
-1. `scraps` 테이블의 구 `job_id` 컬럼 삭제 (`ALTER TABLE scraps DROP COLUMN job_id`)
-2. 구 `jobs` 테이블 DROP
+`DeadlineType` 컬럼을 추가(`FIXED` / `ALWAYS_OPEN` / `UNKNOWN`)해
+공고 유형을 명시적으로 구분했습니다.
+`AlwaysOpenCheckService`를 별도 구현해 상시채용 공고의 원본 URL 접근 여부를
+주기적으로 확인하고 404 응답 시 CLOSED 처리했습니다.
 
 **배운 점**
-`ddl-auto: update`는 안전하지만 잔여 스키마 정리는 수동으로 해야 합니다.
-프로덕션에서는 `validate` + Flyway 같은 마이그레이션 도구 사용이 필요함을 이해했습니다.
+NULL로 상태를 표현하는 것의 한계를 직접 경험했습니다.
+상태값은 Enum으로 명시적으로 관리하는 것이 유지보수에 유리함을 이해했습니다.
 
+---
 
-<br>
+### 5. 운영 환경 한정 버그 — EC2 JVM 타임존
+
+**문제**
+로컬에서는 정상이지만 운영 서버에서 오늘 신규 공고가 항상 0건으로 표시됐습니다.
+
+**원인**
+EC2 JVM 기본 타임존이 UTC로 설정되어 있어
+`LocalDate.now()`가 한국 시각보다 9시간 뒤를 반환했습니다.
+새벽 3시 크롤링 후 "오늘 등록된 공고" 조건이 전날 날짜로 비교됐습니다.
+
+**해결**
+systemd 서비스 파일에 JVM 옵션을 추가했습니다.
+```
+-Duser.timezone=Asia/Seoul
+```
+
+**배운 점**
+로컬과 운영 환경의 타임존 차이가 버그를 유발할 수 있음을 이해했습니다.
+날짜/시간 관련 로직은 항상 타임존을 명시적으로 지정하는 습관을 갖게 됐습니다.
+
+---
+
+### 6. 잡코리아 크롤러 — 2페이지부터 동일 데이터 반복
+
+**문제**
+페이지를 넘겨도 1페이지와 동일한 공고만 계속 수집됐습니다.
+
+**원인**
+잡코리아 목록 페이지가 SPA 구조라 GET 요청은 항상 1페이지만 반환했습니다.
+브라우저 네트워크 탭 분석으로 실제 목록 데이터는
+`POST /Recruit/Home/_GI_List/`로 요청됨을 확인했습니다.
+
+**해결**
+GET 방식에서 POST + Page 파라미터 방식으로 변경했습니다.
+
+```java
+// GET → POST + Page 파라미터 방식으로 변경
+POST /Recruit/Home/_GI_List/
+Body: { Page: 2, PageCount: 20, ... }
+```
+
+**배운 점**
+SPA에서 실제 데이터 요청 방식은 브라우저 네트워크 탭으로 분석해야 함을 이해했습니다.
+개발자 도구의 Network 탭이 크롤러 설계에 핵심 도구임을 경험했습니다.
+
 
 
 
