@@ -11,8 +11,8 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
  * Redis 설정
  *
  * [사용하는 곳]
- * 1. JWT 리프레시 토큰 저장 → key: "refresh:{userId}", value: refreshToken
- * 2. 채용공고 목록 캐싱 (추후 구현)
+ * 1. JWT 리프레시 토큰 저장 → key: "refresh:{email}", value: refreshToken
+ * 2. 통계·공고 목록 캐싱 (@Cacheable)
  */
 @Configuration
 public class RedisConfig {
@@ -32,4 +32,5 @@ public class RedisConfig {
 
         return template;
     }
+
 }

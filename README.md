@@ -110,6 +110,48 @@ public class NewSiteCrawlerService implements CrawlerService { ... }
 
 ---
 
+## 트러블슈팅
+
+### 1. 레이스 컨디션 — 동시 요청 시 중복 크롤링·AI 호출
+
+**문제 상황**
+
+Lazy Fetch 전략으로 공고 상세 내용을 첫 조회 시점에 fetch합니다.
+같은 공고를 동시에 여러 사용자가 처음 열면 모두 `descriptionStatus = null`을 읽고 각자 외부 크롤링 요청 + AI API 호출을 보냅니다.
+데이터 손상은 없지만 동일 URL에 N번 중복 요청 → **IP 차단 위험 + AI 비용 낭비**.
+
+**원인**
+
+DB에 아직 아무것도 저장되지 않은 상태에서 여러 스레드가 동시 접근 → 모두 "null → 크롤링 필요"로 판단 → 각자 크롤러 실행.
+
+**해결 — Striped Locking (Check → Lock → Check 패턴)**
+
+256개 `ReentrantLock`을 미리 생성해두고 `jobId`를 해시로 매핑합니다.
+같은 공고 요청들은 같은 락 스트라이프에서 직렬화되고, 락 획득 후 재확인(Double-Checked)으로 앞선 요청이 이미 저장했으면 즉시 반환합니다.
+
+```java
+// 1단계: 이미 수집됐으면 락 없이 즉시 반환
+if (status != null) return DescriptionResponse.success(job.getDescription());
+
+// 2단계: 스트라이프 락으로 직렬화 (같은 jobId → 같은 락)
+ReentrantLock lock = getStripeLock(jobId);
+lock.lock();
+try {
+    // 3단계: 락 획득 후 재확인 — 대기 중 앞선 요청이 이미 저장했을 수 있음
+    job = jobRepository.findById(jobId).orElseThrow(...);
+    if (job.getDescriptionStatus() != null) return ...;
+
+    // 4단계: 전체 동시 요청 중 딱 1번만 실행
+    return fetchDescriptionBySourceSite(job);
+} finally {
+    lock.unlock();
+}
+```
+
+Redis 분산락(Redisson) 대신 Striped Locking을 선택한 이유: 단일 EC2 서버 환경에서 Redis 네트워크 왕복과 TTL 설정 없이 JVM 내에서 해결 가능하고, 코드가 단순합니다.
+
+---
+
 ## 로컬 실행 방법
 
 **사전 요구사항**: Java 21, Docker, Node.js
