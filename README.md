@@ -239,36 +239,40 @@ JPA의 지연 로딩(LAZY) 전략이 루프 내에서 어떻게 N+1 문제를 �
 
 ---
 
-### 3. 동시 요청 시 중복 크롤링 — 비관적 락으로 해결
+### 3. 동시 요청 시 중복 크롤링 — Redis 분산락으로 해결
 
 **문제**
-미수집 공고를 여러 사용자가 동시에 열면 외부 사이트에 N번 중복 HTTP 요청이 발생해
-IP 차단 위험이 있었습니다.
+미수집 공고를 여러 사용자가 동시에 열면 크롤링 및 AI API요청이 여러번 발생해 리소스 낭비가 있습니다.
 
 **원인**
 모든 요청이 `descriptionStatus = null`을 동시에 읽고
 각자 fetch를 진행하는 레이스 컨디션이 발생했습니다.
 
 **해결**
-Check → Lock → Check 패턴을 적용했습니다.
-첫 번째 요청만 실제 fetch를 수행하고 나머지는 락 대기 후 저장된 결과를 반환합니다.
+Redis를 활용한 분산 락(Distributed Lock)과 Double-Checked Locking 패턴을 적용했습니다.
 
 ```java
-// 1차 확인 (락 없이)
+// 1차 확인 (락 없이) - 성능 최적화
 if (job.getDescriptionStatus() != null) return cached;
 
-// 비관적 락으로 재조회 → 동시 요청 직렬화
-job = jobRepository.findByIdForUpdate(jobId);
-
-// 2차 확인 (락 획득 후) → 대기 중 다른 트랜잭션이 저장했을 수 있음
-if (job.getDescriptionStatus() != null) return cached;
-
-// 실제 fetch
+// 분산 락 획득 (Redisson 활용)
+RLock lock = redissonClient.getLock("lock:job:" + jobId);
+try {
+    if (lock.tryLock(10, 5, TimeUnit.SECONDS)) {
+        // 2차 확인 (락 획득 후) - 대기 중 다른 요청이 이미 처리를 완료했는지 확인
+        if (jobRepository.findById(jobId).get().getDescriptionStatus() != null) {
+            return cached;
+        }
+        // 실제 크롤링 및 AI 요약 fetch 수행
+        executeFetchAndSave(jobId);
+    }
+} finally {
+    if (lock.isHeldByCurrentThread()) lock.unlock();
+}
 ```
 
 **배운 점**
 동시성 문제에서 단순 중복 체크만으로는 레이스 컨디션을 막을 수 없음을 이해했습니다.
-비관적 락(Pessimistic Lock)과 Double-Checked Locking 패턴의 필요성을 직접 경험했습니다.
 
 ---
 
