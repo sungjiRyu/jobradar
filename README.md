@@ -5,20 +5,32 @@
 채용공고 사이트마다 가입하고 필터링하는 번거로움을 해결하기 위해 만든 서비스입니다.
 사람인과 잡코리아의 개발자 공고를 한 곳에서 검색하고, 채용 트렌드를 데이터로 분석합니다.
 
-
-
-
-<br>
-
-## 🔗 배포 URL
-
 **🌐 https://jobradar.me**
 
 테스트 계정: `test@jobradar.com` / `test1234`
 
 <br>
 
-## 📸 주요 화면
+## 📌 목차
+- [1. 프로젝트 소개](#-프로젝트-소개)
+- [2. 주요 화면](#2-기술-스택)
+- [3. 아키텍처 구조](#3-아키텍처-구조)
+- [4. 핵심 기능](#4-핵심-기능)
+- [5. 기술적 문제 해결 및 최적화](#-주요-기능)
+
+<br>
+
+## 🔎 프로젝트 소개
+
+저는 백엔드 개발자를 목표로 취업을 준비하면서
+매일 사람인, 잡코리아를 따로 방문해 공고를 확인하는 번거로움을 느꼈습니다.
+
+이 불편함을 직접 해결하고자 **두 플랫폼의 개발자 공고를 한 곳에서 검색하고,
+채용 트렌드를 데이터로 분석할 수 있는 서비스**를 기획하고 개발했습니다.
+
+<br>
+
+## 2.📸 주요 화면
 
 | 공고 목록 | 공고 상세 | 채용 트렌드 | 스크랩 |
 | :---: | :---: | :---: | :---: |
@@ -26,7 +38,7 @@
 
 <br>
 
-## 🛠 사용 기술
+## 3.🛠 사용 기술
 
 ### Backend
 ![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
@@ -56,7 +68,7 @@
 
 <br>
 
-## 🎯 주요 기능
+## 4. 🎯 주요 기능
 
 ### 1. 채용공고 통합 검색
 - 사람인·잡코리아 개발 직군 공고를 한 곳에서 검색 (총 40,000건+, 매일 업데이트)
@@ -80,13 +92,13 @@
 
 <br>
 
-## 🏗 시스템 아키텍처
+## 5. 🏗 아키텍처
 
 [![Architecture](/jobRadar_arch.svg)](/jobRadar_arch.svg)
 
 <br>
 
-## 💡 기술적 의사결정
+## 6. 💡 기술적 의사결정
 
 ### 1. 왜 JWT + Redis 조합인가?
 
@@ -124,43 +136,7 @@ AccessToken은 짧게 유지하고 RefreshToken을 Redis에 저장하는 하이�
 
 <br>
 
-### 3. 왜 도메인형 패키지 구조를 채택했는가?
-
-
-
-
-
-
-
-
-
-**비교**
-
-**계층형 (Layered)**
-```
-src/
-├── controller/  (모든 Controller)
-├── service/     (모든 Service)
-└── repository/  (모든 Repository)
-```
-
-**도메인형 (Domain) ← 채택**
-```
-src/
-├── user/        (User 관련 전체)
-├── job/         (Job 관련 전체)
-└── scrap/       (Scrap 관련 전체)
-
-```
-
-**선택 이유**
-- 도메인 단위로 응집도가 높아짐
-- 기능 추가/수정 시 한 패키지만 보면 됨
-- 마이크로서비스로 분리할 때 유리
-
-<br>
-
-### 4. 왜 통계 API에 Redis 캐싱을 적용했는가?
+### 3. 왜 통계 API에 Redis 캐싱을 적용했는가?
 
 **문제**
 대시보드의 기술스택/지역/경력 통계는 GROUP BY + COUNT의 무거운 집계 쿼리입니다.
@@ -182,17 +158,7 @@ src/
 
 <br>
 
-### 5. 왜 TypeScript를 선택했는가?
-
-**선택 이유**
-- 컴파일 단계에서 타입 오류 발견 → 런타임 에러 감소
-- Props 타입 명시 → 컴포넌트 사용 방법이 명확
-- IDE 자동완성 → 개발 생산성 향상
-- 백엔드 DTO와 프론트엔드 인터페이스 일치 → 협업 시 명확
-
-<br>
-
-## 🚨 트러블슈팅
+## 7. 🚨 트러블슈팅
 
 ### 1. 잡코리아 크롤링 실패
 
@@ -208,11 +174,6 @@ Jsoup은 정적 HTML만 파싱하므로 데이터를 가져올 수 없었습니�
 - `view-source:` 로 실제 응답 HTML 확인
 - 동적 렌더링 사용하지 않는 정적 페이지(`/recruit/joblist`) 탐색
 - 해당 페이지에 대해서만 Jsoup 크롤링 적용
-
-**배운 점**
-SSR/CSR의 차이와 크롤링 가능 여부 판단 방법을 익혔습니다.
-Selenium 대신 Jsoup을 선택한 것은 EC2 t2.micro 메모리 제약 때문이었는데,
-브라우저를 띄우지 않는 가벼운 방식의 트레이드오프를 이해하게 되었습니다.
 
 ---
 
@@ -233,46 +194,43 @@ List<Scrap> findAllByUserEmailWithJob(@Param("email") String email);
 ```
 쿼리 N+1번 → 1번으로 감소했습니다.
 
-**배운 점**
-JPA의 지연 로딩(LAZY) 전략이 루프 내에서 어떻게 N+1 문제를 유발하는지 이해했습니다.
-`show-sql` 로그로 실제 쿼리 발생 횟수를 확인하는 습관을 갖게 되었습니다.
-
 ---
 
-### 3. 동시 요청 시 중복 크롤링 — Redis 분산락으로 해결
+### 2. 레이스 컨디션 — 동시 요청 시 중복 크롤링·AI 호출
 
 **문제**
-미수집 공고를 여러 사용자가 동시에 열면 크롤링 및 AI API요청이 여러번 발생해 리소스 낭비가 있습니다.
+
+Lazy Fetch 전략으로 공고 상세 내용을 첫 조회 시점에 fetch합니다.
+같은 공고를 동시에 여러 사용자가 처음 열면 모두 `descriptionStatus = null`을 읽고 각자 외부 크롤링 요청 + AI API 호출을 보냅니다.
+동일 URL에 N번 중복 요청 → **IP 차단 위험 + AI 비용 낭비**.
 
 **원인**
-모든 요청이 `descriptionStatus = null`을 동시에 읽고
-각자 fetch를 진행하는 레이스 컨디션이 발생했습니다.
 
-**해결**
-Redis를 활용한 분산 락(Distributed Lock)과 Double-Checked Locking 패턴을 적용했습니다.
+DB에 아직 아무것도 저장되지 않은 상태에서 여러 스레드가 동시 접근 → 모두 "null → 크롤링 필요"로 판단 → 각자 크롤러 실행.
+
+**해결 — Striped Locking (Check → Lock → Check 패턴)**
+
+256개 `ReentrantLock`을 미리 생성해두고 `jobId`를 해시로 매핑합니다.
+같은 공고 요청들은 같은 락 스트라이프에서 직렬화되고, 락 획득 후 재확인(Double-Checked)으로 앞선 요청이 이미 저장했으면 즉시 반환합니다.
 
 ```java
-// 1차 확인 (락 없이) - 성능 최적화
-if (job.getDescriptionStatus() != null) return cached;
+// 1단계: 이미 수집됐으면 락 없이 즉시 반환
+if (status != null) return DescriptionResponse.success(job.getDescription());
 
-// 분산 락 획득 (Redisson 활용)
-RLock lock = redissonClient.getLock("lock:job:" + jobId);
+// 2단계: 스트라이프 락으로 직렬화 (같은 jobId → 같은 락)
+ReentrantLock lock = getStripeLock(jobId);
+lock.lock();
 try {
-    if (lock.tryLock(10, 5, TimeUnit.SECONDS)) {
-        // 2차 확인 (락 획득 후) - 대기 중 다른 요청이 이미 처리를 완료했는지 확인
-        if (jobRepository.findById(jobId).get().getDescriptionStatus() != null) {
-            return cached;
-        }
-        // 실제 크롤링 및 AI 요약 fetch 수행
-        executeFetchAndSave(jobId);
-    }
+    // 3단계: 락 획득 후 재확인 — 대기 중 앞선 요청이 이미 저장했을 수 있음
+    job = jobRepository.findById(jobId).orElseThrow(...);
+    if (job.getDescriptionStatus() != null) return ...;
+
+    // 4단계: 전체 동시 요청 중 딱 1번만 실행
+    return fetchDescriptionBySourceSite(job);
 } finally {
-    if (lock.isHeldByCurrentThread()) lock.unlock();
+    lock.unlock();
 }
 ```
-
-**배운 점**
-동시성 문제에서 단순 중복 체크만으로는 레이스 컨디션을 막을 수 없음을 이해했습니다.
 
 ---
 
@@ -346,7 +304,7 @@ SPA에서 실제 데이터 요청 방식은 브라우저 네트워크 탭으로 
 
 
 
-## 🗂 프로젝트 구조
+## 8. 🗂 프로젝트 구조
 
 
 ### Backend
@@ -387,7 +345,7 @@ jobradar-frontend/
 
 
 
-## 🗄 ERD
+## 9. 🗄 ERD
 
 ```
 ┌──────────────┐         ┌─────────────────┐
@@ -426,7 +384,7 @@ jobradar-frontend/
 
 <br>
 
-## 📋 Changelog
+## 10. 📋 Changelog
 
 ### v1.0.1 (2026-05-24)
 - `chore` favicon 디자인 변경 및 브라우저/기기별 대응 추가
