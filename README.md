@@ -1,124 +1,290 @@
-# JobRadar
+ # JobRadar 🎯
 
-> 개발자 취업준비생을 위한 채용공고 수집 · 관리 서비스
+> 개발자 취업준비생을 위한 채용공고 통합 검색 및 분석 대시보드
 
-[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Redis](https://img.shields.io/badge/Redis-7.0-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![AWS](https://img.shields.io/badge/AWS-EC2%2FRDS%2FS3-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/)
+사람인, 잡코리아를 따로 방문해 공고를 검색하는 번거로움을 느끼고 
+두 플랫폼의 공고를 한 곳에서 검색하고, 채용 트렌드를 데이터로 분석할 수 있는 서비스를 기획·개발 했습니다.
 
-**배포 URL**: https://[배포도메인]
+**🌐 https://jobradar.me**
 
----
+테스트 계정: `test@jobradar.com` / `test1234`
 
-## 서비스 소개
+<br>
 
-사람인, 잡코리아의 채용공고를 매일 자동으로 수집해 한 곳에서 검색·필터링할 수 있는 대시보드 서비스입니다.
-공고 상세 내용은 AI(Gemini)가 자동 요약하고, 관심 공고를 스크랩해 지원 현황을 관리할 수 있습니다.
+<details>
+ <summary> 📋 Version History</summary>
+ 
+### v1.0.1 (2026-05-24)
+- favicon 디자인 변경 및 브라우저/기기별 대응 추가
+  - SVG, ICO, PNG 멀티포맷 적용
+  - iOS 홈 화면, Android PWA 아이콘 지원
+  - site.webmanifest 설정 (theme_color: #378ADD)
 
----
+### v1.0.0 (2026-05-23)
+- 첫번째 릴리즈
+</details>
 
-## 주요 기능
+<details>
+ <summary>🛠 사용 기술</summary>
+ 
+### Backend
+![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.5-6DB33F?logo=springboot&logoColor=white)
+![Spring Security](https://img.shields.io/badge/Spring_Security-7-6DB33F?logo=springsecurity&logoColor=white)
+![JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?logo=spring&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-0.12.6-000000?logo=jsonwebtokens&logoColor=white)
+![Jsoup](https://img.shields.io/badge/Jsoup-1.17.2-3776AB)
 
-| 기능 | 설명 |
-|------|------|
-| 채용공고 자동 수집 | 사람인·잡코리아 크롤링, 매일 새벽 3시 자동 실행 |
-| 검색 · 필터링 | 키워드, 직무, 지역, 경력, 기술스택 복합 필터 |
-| AI 공고 요약 | Gemini API로 상세 내용 자동 요약 (첫 조회 시 생성 후 저장) |
-| 대시보드 통계 | 기술스택·지역·경력별 공고 현황 차트 |
-| 스크랩 관리 | 관심 공고 저장 + 지원예정/완료/서류검토/탈락 상태 관리 |
-| 회원 인증 | JWT + Redis 기반 (AccessToken 15분 / RefreshToken 7일) |
+### Frontend
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
+![Zustand](https://img.shields.io/badge/Zustand-433E38)
+![Chart.js](https://img.shields.io/badge/Chart.js-FF6384?logo=chartdotjs&logoColor=white)
 
----
+### Infrastructure
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7.0-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?logo=amazonec2&logoColor=white)
+![AWS RDS](https://img.shields.io/badge/AWS_RDS-527FFF?logo=amazonrds&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?logo=amazons3&logoColor=white)
+![CloudFront](https://img.shields.io/badge/CloudFront-FF9900?logo=amazoncloudfront&logoColor=white)
+[![Review with CodeRabbit](https://img.shields.io/badge/Review_with-CodeRabbit-brightgreen?style=flat&logo=coderabbit)](https://coderabbit.ai)
 
-## 기술 스택
+</details>
 
-| 분류 | 기술 |
-|------|------|
-| Backend | Java 21, Spring Boot 4.0.5, Spring Security 7, Spring Data JPA |
-| Database | MySQL 8.0, Redis 7.0 |
-| Frontend | React 19 (TypeScript), Tailwind CSS, Zustand, Chart.js, Vite |
-| Infra | AWS EC2 · RDS · S3 · CloudFront, Docker, docker-compose |
-| Crawling | Jsoup 1.17.2 |
-| AI | Google Gemini 2.5 Flash |
-| API Docs | Springdoc OpenAPI (Swagger) |
+<details>
+ <summary>📸 주요 기능</summary>
 
----
+| 통합검색 | AI공고 요약 | 채용 트렌드 | 스크랩 |
+| :---: | :---: | :---: | :---: |
+| <img width="300" src="https://github.com/user-attachments/assets/56b38724-b014-4fab-8309-3e879f46b2a4" /> | <img width="300" src="https://github.com/user-attachments/assets/8c1617c8-14e9-4f9b-b1be-2449cc9e3f15" /> | <img width="300" src="https://github.com/user-attachments/assets/4ab302b9-7ec6-412b-964f-5c9c9500145f" /> | <img width="300" src="https://github.com/user-attachments/assets/d10f85ae-4015-4aee-a210-4a5e3a5f4181" /> |
 
-## 시스템 아키텍처
+
+
+### 1. 채용공고 통합 검색
+- 사람인·잡코리아 개발 직군 공고를 한 곳에서 검색 (총 40,000건+, 매일 업데이트)
+- 직무 / 지역 / 경력 / 기술스택 복합 필터링
+- 키워드 검색 + 드롭다운 멀티필터
+
+### 2. AI 채용공고 요약
+- 긴 공고 본문을 핵심만 추려 한눈에 파악
+- 주요 업무, 자격 요건, 우대 사항을 카테고리별로 분류
+
+### 3. 채용 트렌드 대시보드
+- 전체 / 신규 / 마감 임박 / 신입 공고 실시간 통계
+- 기술스택 수요 순위 (상위 8개 기술스택)
+- 지역별 채용 비중 (상위 10개 지역)
+- 경력별 공고 분포 (신입 / 1\~3년 / 3\~5년 / 5년+)
+
+### 4. 스크랩 + 지원 현황 관리
+- 관심 공고 스크랩
+- 4단계 지원 상태 관리: 지원예정 → 지원완료 → 서류검토 → 결과
+- 상태별 필터링으로 지원 현황 한눈에 파악
+
+</details>
+
+<details>
+<summary>🗂 프로젝트 구조</summary>
+
+### Backend
+```
+jobradar-backend/
+├── src/main/java/com/jobradar/backend/
+│   ├── auth/              # 인증 (로그인, 로그아웃, 토큰 재발급)
+│   │   ├── controller/
+│   │   ├── service/
+│   │   └── dto/
+│   ├── user/              # 회원
+│   ├── job/               # 채용공고
+│   ├── scrap/             # 스크랩
+│   ├── stats/             # 대시보드 통계
+│   ├── crawler/           # 크롤러 (Saramin API + Jobkorea Jsoup)
+│   └── global/            # 공통 (Security, Redis, Exception)
+└── src/test/              # 단위 테스트
+```
+
+### Frontend
+```
+jobradar-frontend/
+├── src/
+│   ├── pages/             # 페이지 (JobList, Dashboard, MyPage 등)
+│   ├── components/        # 재사용 컴포넌트
+│   │   ├── common/        # PrivateRoute 등
+│   │   ├── job/           # JobCard, JobFilter, SearchBar
+│   │   └── layout/        # Navbar, Sidebar
+│   ├── api/               # API 함수 (authApi, jobApi, scrapApi 등)
+│   ├── hooks/             # 커스텀 훅 (useAuth)
+│   ├── store/             # Zustand (authStore)
+│   └── router/            # 라우터 설정
+```
+
+</details>
+
+<details>
+ <summary>🗄 ERD</summary>
 
 ```
-[사용자 브라우저]
-      │
-      ▼
-[CloudFront + S3]        ← React 정적 빌드 배포
-      │ API 요청 (HTTPS)
-      ▼
-[EC2 — Spring Boot :8080]
-      ├── Redis 7.0       ← JWT 토큰 저장 / 통계 캐싱
-      └── RDS MySQL 8.0   ← 공고 / 유저 / 스크랩 데이터
-            ↑
-[CrawlerScheduler — 매일 새벽 03:00 KST]
-      ├── SaraminCrawlerService   (사람인)
-      └── JobkoreaCrawlerService  (잡코리아)
+┌──────────────┐         ┌─────────────────┐
+│    users     │         │   job_posts     │
+├──────────────┤         ├─────────────────┤
+│ id (PK)      │         │ id (PK)         │
+│ email (UK)   │         │ title           │
+│ password     │         │ company         │
+│ nickname     │         │ location        │
+│ role         │         │ experience      │
+└──────┬───────┘         │ deadline        │
+       │ 1:N             │ url             │
+       │                 │ view_count      │
+       ▼                 │ created_at      │
+┌──────────────┐         └─────────┬───────┘
+│    scraps    │                   │ 1:N
+├──────────────┤                   ▼
+│ id (PK)      │         ┌─────────────────┐
+│ user_id (FK) │←────────│ job_post_stacks │
+│ job_post_id  │         ├─────────────────┤
+│ status (EN)  │         │ id (PK)         │
+│ created_at   │         │ job_post_id(FK) │
+└──────────────┘         │ tech_stack_id   │
+                         └────────┬────────┘
+                                  │ N:1
+                                  ▼
+                         ┌─────────────────┐
+                         │  tech_stacks    │
+                         ├─────────────────┤
+                         │ id (PK)         │
+                         │ name (UK)       │
+                         └─────────────────┘
 ```
+</details>
+
+<details>
+ <summary>🏗 아키텍처</summary>
+
+[![Architecture](/jobRadar_arch.svg)](/jobRadar_arch.svg)
+
+</details>
+
+<br>
+
+## 📌 목차
+<details>
+ <summary>기술적 의사결정</summary>
+</details>
+
+<details>
+ <summary>트러블 슈팅</summary>
+</details>
+<br>
+
+
+
+
+
+<br>
+
+
+## 💡 기술적 의사결정
+
+### 1. 로그인 방식 결정(Session vs JWT)
+
+#### 세션과 JWT 비교
+* 세션 방식은 Stateful한 방식으로 서버가 사용자 정보를 직접 저장합니다. 따라서 사용자가 늘어날수록 서버의 자원 부하가 증가한다는 단점이 있습니다. 또한, 추후 Scale-out 시 여러 서버 간 세션을 공유하기 위해 Redis 등을 활용한 세션 클러스터링 구축이 필요하므로, 아키텍처의 확장성 측면에서 제약이 생깁니다.
+* 반면에, JWT 방식은 Stateless한 방식으로 서버가 사용자의 정보를 저장하지 않기 때문에 확장성 측면에서 장점이 있습니다. 다만, 토큰이 탈취된다면 만료되기 전까지 서버측에서 무효화 할 방법이 없다는 단점이 있습니다. 
+
+#### JWT 채택과 이유
+아래와 같은 사항을 고려해서 JWT를 채택했습니다.
+* 추후 확장성과 Ec2 서버 부하 감소
+* 크로스도메인 환경을 고려했을때 JWT가 구현에 용이
+* RefreshToken과 Redis를 사용해서 보안 취약점을 보완
+
+<br>
+
+
+### 2. 데이터 수집 방식(웹크롤링 VS 공식 API)
+
+**문제**
+* 성능과 안전성 측면에서 공식API를 사용하려 했습니다. 그러나 잡코리아는 개인에게 API를 발급하지 않았고 사람인은 API발급을 신청했으나 거절당했습니다.
+
+**웹 크롤링 방식(jsoup vs Playwright)**
+* 정적 웹페이지 크롤링(jsoup) 방식은 서버에서 완성된 HTML
+
+
+**선택 이유**
+공식 API가 있는 곳은 API를 우선 사용 (안정성, 법적 안전성).
+공식 API가 없는 곳은 robots.txt 준수 + 요청 간격 1초 + User-Agent 설정으로 윤리적 크롤링.
+
+<br>
+
+### 3. 왜 통계 API에 Redis 캐싱을 적용했는가?
+
+**문제**
+대시보드의 기술스택/지역/경력 통계는 GROUP BY + COUNT의 무거운 집계 쿼리입니다.
+사용자가 대시보드를 열 때마다 13,000건의 데이터를 매번 집계하면 DB 부하가 큽니다.
+
+**해결**
+`@Cacheable`로 결과를 Redis에 캐싱.
+
+**TTL 전략**
+- 통계 데이터 (자주 안 바뀜) → 10분
+- 오늘의 현황 (빠른 반영 필요) → 1분
+
+**성능 측정**
+| API | 캐싱 미적용 | 캐싱 적용 |
+|-----|-----------|----------|
+| `/api/stats/tech-stacks` | 234ms | 8ms |
+| `/api/stats/locations` | 198ms | 6ms |
+| `/api/stats/experience` | 187ms | 7ms |
+
+<br>
+
+## 🚨 트러블슈팅
+
+### 1. 잡코리아 크롤링 실패
+
+**문제**
+잡코리아 검색 페이지가 Jsoup 크롤링 시 빈 결과를 반환했습니다.
+
+**원인**
+잡코리아 검색 페이지는 Next.js 기반 SPA로,
+JavaScript가 실행되어야 데이터가 렌더링됩니다.
+Jsoup은 정적 HTML만 파싱하므로 데이터를 가져올 수 없었습니다.
+
+**해결**
+- `view-source:` 로 실제 응답 HTML 확인
+- 동적 렌더링 사용하지 않는 정적 페이지(`/recruit/joblist`) 탐색
+- 해당 페이지에 대해서만 Jsoup 크롤링 적용
 
 ---
 
-## 핵심 구현
+### 2. N+1 문제 → JOIN FETCH로 쿼리 최적화
 
-### 1. Lazy Fetch 전략 — 크롤링 부하 절감
+**문제**
+스크랩 목록 조회 시 `show-sql` 로그에서 SQL이 N+1번 출력됨을 발견했습니다.
+스크랩 100개를 조회하면 Job SELECT 쿼리가 100번 추가 발생했습니다.
 
-크롤링 시점에는 공고 목록(제목·회사·마감일)만 수집하고, 상세 내용(description)은 사용자가 처음 조회할 때 fetch합니다.
-요청 수를 절반으로 줄여 IP 차단 위험을 낮추고, 크롤링 시간을 단축했습니다.
+**원인**
+`Scrap.job` 필드가 `FetchType.LAZY`로 설정되어 있어
+루프에서 `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
 
+**해결**
 ```java
-// descriptionStatus가 null → 아직 fetch 안 된 상태 → 지금 가져옴
-if (job.getDescriptionStatus() == null) {
-    fetchAndSaveDescription(job);
-}
+@Query("SELECT s FROM Scrap s JOIN FETCH s.job WHERE s.user.email = :email")
+List<Scrap> findAllByUserEmailWithJob(@Param("email") String email);
 ```
-
-### 2. Redis 멀티레이어 캐싱 — TTL 세분화
-
-조회 빈도와 데이터 변경 주기에 따라 TTL을 다르게 설정했습니다.
-
-| 캐시 대상 | TTL | 이유 |
-|----------|-----|------|
-| 기술스택·지역·경력 통계 | 10분 | 크롤링 주기(1일) 대비 충분 |
-| 오늘의 현황 | 1분 | 신규 공고 빠른 반영 필요 |
-| RefreshToken | 7일 | 토큰 만료 주기와 TTL 일치 |
-
-### 3. 확장 가능한 크롤러 설계 — OCP 준수
-
-`CrawlerService` 인터페이스를 구현하기만 하면 `CrawlerScheduler`가 자동으로 감지해 실행합니다.
-새로운 사이트를 추가할 때 기존 코드를 전혀 수정하지 않아도 됩니다.
-
-```java
-// List<CrawlerService>로 모든 구현체 자동 주입
-// 새 크롤러 = @Component 클래스 1개 추가로 끝
-@Component
-public class NewSiteCrawlerService implements CrawlerService { ... }
-```
-
-### 4. JWT + Redis 이중 보안
-
-- AccessToken 15분 단기 유효 → 탈취 시 피해 최소화
-- RefreshToken Redis 저장 → 로그아웃 시 서버에서 즉시 무효화
-- 토큰 재발급 시 Redis 저장값과 비교 → 탈취된 토큰 차단
+쿼리 N+1번 → 1번으로 감소했습니다.
 
 ---
 
-## 트러블슈팅
+### 2. 레이스 컨디션 — 동시 요청 시 중복 크롤링·AI 호출
 
-### 1. 레이스 컨디션 — 동시 요청 시 중복 크롤링·AI 호출
-
-**문제 상황**
+**문제**
 
 Lazy Fetch 전략으로 공고 상세 내용을 첫 조회 시점에 fetch합니다.
 같은 공고를 동시에 여러 사용자가 처음 열면 모두 `descriptionStatus = null`을 읽고 각자 외부 크롤링 요청 + AI API 호출을 보냅니다.
-데이터 손상은 없지만 동일 URL에 N번 중복 요청 → **IP 차단 위험 + AI 비용 낭비**.
+동일 URL에 N번 중복 요청 → **IP 차단 위험 + AI 비용 낭비**.
 
 **원인**
 
@@ -148,62 +314,78 @@ try {
 }
 ```
 
-Redis 분산락(Redisson) 대신 Striped Locking을 선택한 이유: 단일 EC2 서버 환경에서 Redis 네트워크 왕복과 TTL 설정 없이 JVM 내에서 해결 가능하고, 코드가 단순합니다.
+---
+
+### 4. 상시채용 공고 마감 처리 — DeadlineType 컬럼 설계
+
+**문제**
+`deadline = NULL`인 상시채용 공고는 사이트에서 내려가도
+마감일 기반 스케줄러가 감지하지 못해 삭제된 공고가 계속 노출됐습니다.
+
+**원인**
+기존 설계가 마감일(날짜) 유무만으로 공고 상태를 판단했습니다.
+NULL은 처리할 수 없는 구조였습니다.
+
+**해결**
+`DeadlineType` 컬럼을 추가(`FIXED` / `ALWAYS_OPEN` / `UNKNOWN`)해
+공고 유형을 명시적으로 구분했습니다.
+`AlwaysOpenCheckService`를 별도 구현해 상시채용 공고의 원본 URL 접근 여부를
+주기적으로 확인하고 404 응답 시 CLOSED 처리했습니다.
+
+**배운 점**
+NULL로 상태를 표현하는 것의 한계를 직접 경험했습니다.
+상태값은 Enum으로 명시적으로 관리하는 것이 유지보수에 유리함을 이해했습니다.
 
 ---
 
-## 로컬 실행 방법
+### 5. 운영 환경 한정 버그 — EC2 JVM 타임존
 
-**사전 요구사항**: Java 21, Docker, Node.js
+**문제**
+로컬에서는 정상이지만 운영 서버에서 오늘 신규 공고가 항상 0건으로 표시됐습니다.
 
-```bash
-# 1. 저장소 클론
-git clone https://github.com/sungjiRyu/jobradar.git
-cd jobradar
+**원인**
+EC2 JVM 기본 타임존이 UTC로 설정되어 있어
+`LocalDate.now()`가 한국 시각보다 9시간 뒤를 반환했습니다.
+새벽 3시 크롤링 후 "오늘 등록된 공고" 조건이 전날 날짜로 비교됐습니다.
 
-# 2. 환경변수 설정
-cp .env.example .env
-# .env 파일에서 DB 비밀번호, JWT Secret, Gemini API Key 설정
-
-# 3. MySQL + Redis 컨테이너 실행
-docker-compose up -d
-
-# 4. 백엔드 실행
-cd jobradar-backend
-./gradlew bootRun
-
-# 5. 프론트엔드 실행 (새 터미널)
-cd jobradar-frontend
-npm install
-npm run dev
+**해결**
+systemd 서비스 파일에 JVM 옵션을 추가했습니다.
+```
+-Duser.timezone=Asia/Seoul
 ```
 
-프론트엔드: `http://localhost:5173`
-백엔드 API: `http://localhost:8080`
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+**배운 점**
+로컬과 운영 환경의 타임존 차이가 버그를 유발할 수 있음을 이해했습니다.
+날짜/시간 관련 로직은 항상 타임존을 명시적으로 지정하는 습관을 갖게 됐습니다.
 
 ---
 
-## 프로젝트 구조
+### 6. 잡코리아 크롤러 — 2페이지부터 동일 데이터 반복
 
+**문제**
+페이지를 넘겨도 1페이지와 동일한 공고만 계속 수집됐습니다.
+
+**원인**
+잡코리아 목록 페이지가 SPA 구조라 GET 요청은 항상 1페이지만 반환했습니다.
+브라우저 네트워크 탭 분석으로 실제 목록 데이터는
+`POST /Recruit/Home/_GI_List/`로 요청됨을 확인했습니다.
+
+**해결**
+GET 방식에서 POST + Page 파라미터 방식으로 변경했습니다.
+
+```java
+// GET → POST + Page 파라미터 방식으로 변경
+POST /Recruit/Home/_GI_List/
+Body: { Page: 2, PageCount: 20, ... }
 ```
-jobradar/
-├── jobradar-backend/
-│   └── src/main/java/com/jobradar/backend/
-│       ├── auth/        # JWT 인증 (로그인·로그아웃·토큰 재발급)
-│       ├── user/        # 회원 관리 (가입·수정·탈퇴)
-│       ├── job/         # 채용공고 조회·검색·필터
-│       ├── scrap/       # 스크랩 CRUD + 상태 관리
-│       ├── stats/       # 대시보드 통계 (Redis 캐싱)
-│       ├── crawler/     # 크롤링 스케줄러 + 사이트별 구현
-│       └── global/      # 공통 설정·예외·보안 필터
-├── jobradar-frontend/
-│   └── src/
-│       ├── pages/       # 페이지 컴포넌트
-│       ├── components/  # 공통 UI 컴포넌트
-│       ├── api/         # Axios 인스턴스 + API 함수
-│       ├── hooks/       # 커스텀 훅
-│       ├── store/       # Zustand 전역 상태
-│       └── utils/       # 유틸 함수
-└── docker-compose.yml
-```
+
+**배운 점**
+SPA에서 실제 데이터 요청 방식은 브라우저 네트워크 탭으로 분석해야 함을 이해했습니다.
+개발자 도구의 Network 탭이 크롤러 설계에 핵심 도구임을 경험했습니다.
+
+
+
+
+
+---
+*이 프로젝트는 포트폴리오 목적으로 제작되었습니다. 크롤링은 robots.txt를 준수하며, 비상업적 학습용으로만 사용됩니다.*
