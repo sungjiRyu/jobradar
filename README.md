@@ -2,8 +2,8 @@
 
 > 개발자 취업준비생을 위한 채용공고 통합 검색 및 분석 대시보드
 
-채용공고 사이트마다 가입하고 필터링하는 번거로움을 해결하기 위해 만든 서비스입니다.
-사람인과 잡코리아의 개발자 공고를 한 곳에서 검색하고, 채용 트렌드를 데이터로 분석합니다.
+사람인, 잡코리아를 따로 방문해 공고를 검색하는 번거로움을 느끼고 
+두 플랫폼의 공고를 한 곳에서 검색하고, 채용 트렌드를 데이터로 분석할 수 있는 서비스를 기획·개발 했습니다.
 
 **🌐 https://jobradar.me**
 
@@ -11,35 +11,22 @@
 
 <br>
 
-## 📌 목차
-- [1. 프로젝트 소개](#-프로젝트-소개)
-- [2. 주요 화면](#2-기술-스택)
-- [3. 아키텍처 구조](#3-아키텍처-구조)
-- [4. 핵심 기능](#4-핵심-기능)
-- [5. 기술적 문제 해결 및 최적화](#-주요-기능)
+<details>
+ <summary> 📋 Version History</summary>
+ 
+### v1.0.1 (2026-05-24)
+- favicon 디자인 변경 및 브라우저/기기별 대응 추가
+  - SVG, ICO, PNG 멀티포맷 적용
+  - iOS 홈 화면, Android PWA 아이콘 지원
+  - site.webmanifest 설정 (theme_color: #378ADD)
 
-<br>
+### v1.0.0 (2026-05-23)
+- 첫번째 릴리즈
+</details>
 
-## 🔎 프로젝트 소개
-
-저는 백엔드 개발자를 목표로 취업을 준비하면서
-매일 사람인, 잡코리아를 따로 방문해 공고를 확인하는 번거로움을 느꼈습니다.
-
-이 불편함을 직접 해결하고자 **두 플랫폼의 개발자 공고를 한 곳에서 검색하고,
-채용 트렌드를 데이터로 분석할 수 있는 서비스**를 기획하고 개발했습니다.
-
-<br>
-
-## 2.📸 주요 화면
-
-| 공고 목록 | 공고 상세 | 채용 트렌드 | 스크랩 |
-| :---: | :---: | :---: | :---: |
-| <img width="300" src="https://github.com/user-attachments/assets/56b38724-b014-4fab-8309-3e879f46b2a4" /> | <img width="300" src="https://github.com/user-attachments/assets/8c1617c8-14e9-4f9b-b1be-2449cc9e3f15" /> | <img width="300" src="https://github.com/user-attachments/assets/4ab302b9-7ec6-412b-964f-5c9c9500145f" /> | <img width="300" src="https://github.com/user-attachments/assets/d10f85ae-4015-4aee-a210-4a5e3a5f4181" /> |
-
-<br>
-
-## 3.🛠 사용 기술
-
+<details>
+ <summary>🛠 사용 기술</summary>
+ 
 ### Backend
 ![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.5-6DB33F?logo=springboot&logoColor=white)
@@ -66,9 +53,16 @@
 ![CloudFront](https://img.shields.io/badge/CloudFront-FF9900?logo=amazoncloudfront&logoColor=white)
 [![Review with CodeRabbit](https://img.shields.io/badge/Review_with-CodeRabbit-brightgreen?style=flat&logo=coderabbit)](https://coderabbit.ai)
 
-<br>
+</details>
 
-## 4. 🎯 주요 기능
+<details>
+ <summary>📸 주요 기능</summary>
+
+| 통합검색 | AI공고 요약 | 채용 트렌드 | 스크랩 |
+| :---: | :---: | :---: | :---: |
+| <img width="300" src="https://github.com/user-attachments/assets/56b38724-b014-4fab-8309-3e879f46b2a4" /> | <img width="300" src="https://github.com/user-attachments/assets/8c1617c8-14e9-4f9b-b1be-2449cc9e3f15" /> | <img width="300" src="https://github.com/user-attachments/assets/4ab302b9-7ec6-412b-964f-5c9c9500145f" /> | <img width="300" src="https://github.com/user-attachments/assets/d10f85ae-4015-4aee-a210-4a5e3a5f4181" /> |
+
+
 
 ### 1. 채용공고 통합 검색
 - 사람인·잡코리아 개발 직군 공고를 한 곳에서 검색 (총 40,000건+, 매일 업데이트)
@@ -90,13 +84,104 @@
 - 4단계 지원 상태 관리: 지원예정 → 지원완료 → 서류검토 → 결과
 - 상태별 필터링으로 지원 현황 한눈에 파악
 
-<br>
+</details>
 
-## 5. 🏗 아키텍처
+<details>
+<summary>🗂 프로젝트 구조</summary>
+
+### Backend
+```
+jobradar-backend/
+├── src/main/java/com/jobradar/backend/
+│   ├── auth/              # 인증 (로그인, 로그아웃, 토큰 재발급)
+│   │   ├── controller/
+│   │   ├── service/
+│   │   └── dto/
+│   ├── user/              # 회원
+│   ├── job/               # 채용공고
+│   ├── scrap/             # 스크랩
+│   ├── stats/             # 대시보드 통계
+│   ├── crawler/           # 크롤러 (Saramin API + Jobkorea Jsoup)
+│   └── global/            # 공통 (Security, Redis, Exception)
+└── src/test/              # 단위 테스트
+```
+
+### Frontend
+```
+jobradar-frontend/
+├── src/
+│   ├── pages/             # 페이지 (JobList, Dashboard, MyPage 등)
+│   ├── components/        # 재사용 컴포넌트
+│   │   ├── common/        # PrivateRoute 등
+│   │   ├── job/           # JobCard, JobFilter, SearchBar
+│   │   └── layout/        # Navbar, Sidebar
+│   ├── api/               # API 함수 (authApi, jobApi, scrapApi 등)
+│   ├── hooks/             # 커스텀 훅 (useAuth)
+│   ├── store/             # Zustand (authStore)
+│   └── router/            # 라우터 설정
+```
+
+</details>
+
+<details>
+ <summary>🗄 ERD</summary>
+
+```
+┌──────────────┐         ┌─────────────────┐
+│    users     │         │   job_posts     │
+├──────────────┤         ├─────────────────┤
+│ id (PK)      │         │ id (PK)         │
+│ email (UK)   │         │ title           │
+│ password     │         │ company         │
+│ nickname     │         │ location        │
+│ role         │         │ experience      │
+└──────┬───────┘         │ deadline        │
+       │ 1:N             │ url             │
+       │                 │ view_count      │
+       ▼                 │ created_at      │
+┌──────────────┐         └─────────┬───────┘
+│    scraps    │                   │ 1:N
+├──────────────┤                   ▼
+│ id (PK)      │         ┌─────────────────┐
+│ user_id (FK) │←────────│ job_post_stacks │
+│ job_post_id  │         ├─────────────────┤
+│ status (EN)  │         │ id (PK)         │
+│ created_at   │         │ job_post_id(FK) │
+└──────────────┘         │ tech_stack_id   │
+                         └────────┬────────┘
+                                  │ N:1
+                                  ▼
+                         ┌─────────────────┐
+                         │  tech_stacks    │
+                         ├─────────────────┤
+                         │ id (PK)         │
+                         │ name (UK)       │
+                         └─────────────────┘
+```
+</details>
+
+<details>
+ <summary>🏗 아키텍처</summary>
 
 [![Architecture](/jobRadar_arch.svg)](/jobRadar_arch.svg)
 
+</details>
+
 <br>
+
+## 📌 목차
+- [3. 아키텍처 구조](#3-아키텍처-구조)
+- [4. 핵심 기능](#4-핵심-기능)
+- [5. 기술적 문제 해결 및 최적화](#-주요-기능)
+
+<br>
+
+
+
+
+
+<br>
+
 
 ## 6. 💡 기술적 의사결정
 
@@ -304,96 +389,6 @@ SPA에서 실제 데이터 요청 방식은 브라우저 네트워크 탭으로 
 
 
 
-## 8. 🗂 프로젝트 구조
-
-
-### Backend
-```
-jobradar-backend/
-├── src/main/java/com/jobradar/backend/
-│   ├── auth/              # 인증 (로그인, 로그아웃, 토큰 재발급)
-│   │   ├── controller/
-│   │   ├── service/
-│   │   └── dto/
-│   ├── user/              # 회원
-│   ├── job/               # 채용공고
-│   ├── scrap/             # 스크랩
-│   ├── stats/             # 대시보드 통계
-│   ├── crawler/           # 크롤러 (Saramin API + Jobkorea Jsoup)
-│   └── global/            # 공통 (Security, Redis, Exception)
-└── src/test/              # 단위 테스트
-```
-
-### Frontend
-```
-jobradar-frontend/
-├── src/
-│   ├── pages/             # 페이지 (JobList, Dashboard, MyPage 등)
-│   ├── components/        # 재사용 컴포넌트
-│   │   ├── common/        # PrivateRoute 등
-│   │   ├── job/           # JobCard, JobFilter, SearchBar
-│   │   └── layout/        # Navbar, Sidebar
-│   ├── api/               # API 함수 (authApi, jobApi, scrapApi 등)
-│   ├── hooks/             # 커스텀 훅 (useAuth)
-│   ├── store/             # Zustand (authStore)
-│   └── router/            # 라우터 설정
-```
-
-<br>
-
-
-
-
-
-## 9. 🗄 ERD
-
-```
-┌──────────────┐         ┌─────────────────┐
-│    users     │         │   job_posts     │
-├──────────────┤         ├─────────────────┤
-│ id (PK)      │         │ id (PK)         │
-│ email (UK)   │         │ title           │
-│ password     │         │ company         │
-│ nickname     │         │ location        │
-│ role         │         │ experience      │
-└──────┬───────┘         │ deadline        │
-       │ 1:N             │ url             │
-       │                 │ view_count      │
-       ▼                 │ created_at      │
-┌──────────────┐         └─────────┬───────┘
-│    scraps    │                   │ 1:N
-├──────────────┤                   ▼
-│ id (PK)      │         ┌─────────────────┐
-│ user_id (FK) │←────────│ job_post_stacks │
-│ job_post_id  │         ├─────────────────┤
-│ status (EN)  │         │ id (PK)         │
-│ created_at   │         │ job_post_id(FK) │
-└──────────────┘         │ tech_stack_id   │
-                         └────────┬────────┘
-                                  │ N:1
-                                  ▼
-                         ┌─────────────────┐
-                         │  tech_stacks    │
-                         ├─────────────────┤
-                         │ id (PK)         │
-                         │ name (UK)       │
-                         └─────────────────┘
-```
-
-<br>
-
-<br>
-
-## 10. 📋 Changelog
-
-### v1.0.1 (2026-05-24)
-- `chore` favicon 디자인 변경 및 브라우저/기기별 대응 추가
-  - SVG, ICO, PNG 멀티포맷 적용
-  - iOS 홈 화면, Android PWA 아이콘 지원
-  - site.webmanifest 설정 (theme_color: #378ADD)
-
-### v1.0.0 (2026-05-23)
-- 최초 배포
 
 ---
 *이 프로젝트는 포트폴리오 목적으로 제작되었습니다. 크롤링은 robots.txt를 준수하며, 비상업적 학습용으로만 사용됩니다.*
