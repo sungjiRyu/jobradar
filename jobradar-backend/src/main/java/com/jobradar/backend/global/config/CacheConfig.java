@@ -28,7 +28,7 @@ import java.util.Map;
 @EnableCaching // @Cacheable, @CacheEvict 등 캐시 어노테이션 활성화
 public class CacheConfig {
 
-    // 캐시 이름 상수 (오타 방지를 위해 상수로 관리)
+    // 캐시 이름
     public static final String CACHE_TECH_STACKS = "stats:tech-stacks";
     public static final String CACHE_LOCATIONS   = "stats:locations";
     public static final String CACHE_TODAY       = "stats:today";
@@ -37,11 +37,11 @@ public class CacheConfig {
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
 
-        // 기본 캐시 설정: JSON 직렬화, null 캐싱 비허용, TTL 10분
+        // 기본 캐시 설정: JSON 직렬화, null 캐싱 비허용, TTL 24시간
         // GenericJackson2JsonRedisSerializer: 클래스 로더 정보 없이 JSON으로 저장
         // → DevTools 재시작 후에도 ClassCastException 없이 정상 역직렬화 가능
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))
+                .entryTtl(Duration.ofHours(24))
                 .disableCachingNullValues()
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(
@@ -51,10 +51,10 @@ public class CacheConfig {
 
         // 캐시별 TTL 개별 설정
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put(CACHE_TECH_STACKS, defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put(CACHE_LOCATIONS,   defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put(CACHE_EXPERIENCE,  defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put(CACHE_TODAY,       defaultConfig.entryTtl(Duration.ofMinutes(1)));
+        cacheConfigs.put(CACHE_TECH_STACKS, defaultConfig.entryTtl(Duration.ofHours(24)));
+        cacheConfigs.put(CACHE_LOCATIONS,   defaultConfig.entryTtl(Duration.ofHours(24)));
+        cacheConfigs.put(CACHE_EXPERIENCE,  defaultConfig.entryTtl(Duration.ofHours(24)));
+        cacheConfigs.put(CACHE_TODAY,       defaultConfig.entryTtl(Duration.ofHours(24)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
