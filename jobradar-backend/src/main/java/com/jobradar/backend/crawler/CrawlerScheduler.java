@@ -1,8 +1,11 @@
 package com.jobradar.backend.crawler;
 
+import com.jobradar.backend.global.config.CacheConfig;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -56,6 +59,12 @@ public class CrawlerScheduler {
      * [주의] @EnableScheduling이 main 클래스에 있어야 동작함
      */
     @Scheduled(cron = "0 0 3 * * *")
+    @CacheEvict(cacheNames = {
+        CacheConfig.CACHE_TECH_STACKS,
+        CacheConfig.CACHE_LOCATIONS,
+        CacheConfig.CACHE_EXPERIENCE,
+        CacheConfig.CACHE_TODAY
+    }, allEntries = true)
     public void runCrawling() {
         log.info("===== 채용공고 수집 스케줄러 시작 =====");
 
@@ -81,6 +90,12 @@ public class CrawlerScheduler {
      * 만료 공고를 보지 않도록 보장한다.
      */
     @Scheduled(cron = "0 0 0 * * *")
+    @CacheEvict(cacheNames = {
+        CacheConfig.CACHE_TECH_STACKS,
+        CacheConfig.CACHE_LOCATIONS,
+        CacheConfig.CACHE_EXPERIENCE,
+        CacheConfig.CACHE_TODAY
+    }, allEntries = true)
     public void closeExpiredJobsScheduled() {
         log.info("===== 마감 공고 정리 스케줄러 시작 =====");
         try {
