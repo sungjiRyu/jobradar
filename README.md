@@ -280,8 +280,7 @@ jobradar-frontend/
      
 * 성능 향상 지표 (/api/stats/today)
    | 측정 지표 | 개선 전 (Full Scan) | 개선 후 (Covering Index) | 성능 개선 효과 |
-   | :--- | :--- | :--- | :--- |
-   | P(95) 응답 시간 | 4,579.76 ms | 3,991.85 ms | 약 13% 단축 |
+   | :--- | :--- | :--- | :--- |   
    | 평균 응답 (Avg) | 3,395.02 ms | 2,171.53 ms |  약 36% 단축 |
    | 초당 처리량 (RPS)| 17.55 req/s | 24.05 req/s |  약 37% 증가 |
 
@@ -328,11 +327,13 @@ jobradar-frontend/
 * 캐시 적용 후
 <img weight= "1200" height="300" alt="image" src="https://github.com/user-attachments/assets/4a173b5e-aeee-44c0-be95-0d1b81f07f47" />
 
+* 성능 향상 지표
+
 | 측정 지표 | 캐시 적용 전 | 캐시 적용 후 | 성능 개선 효과 |
 | :--- | :--- | :--- | :--- |
-| P(95) 응답 시간 | 3,444.54 ms | 5.00 ms | 약 99.8% 단축 |
 | 평균 응답 (Avg) | 2,471.44 ms | 5.41 ms | 약 99.8% 단축 |
 | 초당 처리량 (RPS)| 21.90 req/s | 75.24 req/s | 약 244% 증가 |
+
 ---
 <br>
 
