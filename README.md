@@ -176,7 +176,8 @@ jobradar-frontend/
 4. [DB부하 감소를 위한 캐싱 적용](#4-DB부하-감소를-위한-캐싱-적용)
 5. [N+1 문제 해결](#5-N+1-문제-해결)
 6. [lock 을 이용한 동시성 제어](#6-lock-을-이용한-동시성-제어)
-7. [운영 환경 타임존 설정]
+7. [운영 환경 타임존 설정](#7-운영-환경-타임존—설정)
+
 <br>
 
 
@@ -320,20 +321,18 @@ jobradar-frontend/
 `Grafana` 와 `Prometheus` 를 사용해서 `DB Connetion pool`의 변화를 확인해 보았습니다.
 
 * 캐시 적용 전
+
+
 <img weight= "1200" height="300" alt="image" style="border-radius: 100%;" src="https://github.com/user-attachments/assets/76057461-e1cb-4020-9f30-ffc522bdaefc" />
 
 * 캐시 적용 후
 <img weight= "1200" height="300" alt="image" src="https://github.com/user-attachments/assets/4a173b5e-aeee-44c0-be95-0d1b81f07f47" />
 
-
-
-
 | 측정 지표 | 캐시 적용 전 | 캐시 적용 후 | 성능 개선 효과 |
 | :--- | :--- | :--- | :--- |
-| P(95) 응답 시간 | 4,579.76 ms | 3,991.85 ms | 약 13% 단축 |
-| 평균 응답 (Avg) | 3,395.02 ms | 2,171.53 ms |  약 36% 단축 |
-| 초당 처리량 (RPS)| 17.55 req/s | 24.05 req/s |  약 37% 증가 |
-
+| P(95) 응답 시간 | 3,444.54 ms | 5.00 ms | 약 99.8% 단축 |
+| 평균 응답 (Avg) | 2,471.44 ms | 5.41 ms | 약 99.8% 단축 |
+| 초당 처리량 (RPS)| 21.90 req/s | 75.24 req/s | 약 244% 증가 |
 ---
 <br>
 
@@ -357,7 +356,7 @@ List<Scrap> findAllByUserEmailWithJob(@Param("email") String email);
 ---
 <br>
 
-### 6. 레이스 컨디션
+### 6. lock 을 이용한 동시성 제어
 
 **문제**
 
@@ -396,7 +395,7 @@ try {
 ---
 <br>
 
-### 7. 운영 환경 한정 버그 — EC2 JVM 타임존
+### 7. 운영 환경 타임존 설정
 
 **문제**
 로컬에서는 정상이지만 운영 서버에서 오늘 신규 공고가 항상 0건으로 표시됐습니다.
@@ -417,5 +416,7 @@ systemd 서비스 파일에 JVM 옵션을 추가했습니다.
 날짜/시간 관련 로직은 항상 타임존을 명시적으로 지정하는 습관을 갖게 됐습니다.
 
 <br>
+
 ---
+
 *이 프로젝트는 포트폴리오 목적으로 제작되었습니다. 크롤링은 robots.txt를 준수하며, 비상업적 학습용으로만 사용됩니다.*
