@@ -317,6 +317,14 @@ jobradar-frontend/
 
 캐시 계층 도입 후 동일한 [성능 테스트(100 VUs)](#3-3-성능-테스트)를 수행했습니다.
 
+`Grafana` 와 `Prometheus` 를 사용해서 `DB Connetion pool`의 변화를 확인해 보았습니다.
+
+* 캐시 적용 전
+<img height="300" alt="image" style="border-radius: 50px;" src="https://github.com/user-attachments/assets/76057461-e1cb-4020-9f30-ffc522bdaefc" />
+<img height="300" alt="image" style="border-radius: 50px;" src="https://github.com/user-attachments/assets/44aeb139-d457-4171-90a3-5bde0c1b9ff9" />
+
+
+
 | 측정 지표 | 캐시 적용 전 | 캐시 적용 후 | 성능 개선 효과 |
 | :--- | :--- | :--- | :--- |
 | P(95) 응답 시간 | 4,579.76 ms | 3,991.85 ms | 약 13% 단축 |
