@@ -320,8 +320,11 @@ jobradar-frontend/
 `Grafana` 와 `Prometheus` 를 사용해서 `DB Connetion pool`의 변화를 확인해 보았습니다.
 
 * 캐시 적용 전
-<img height="300" alt="image" style="border-radius: 50px;" src="https://github.com/user-attachments/assets/76057461-e1cb-4020-9f30-ffc522bdaefc" />
-<img height="300" alt="image" style="border-radius: 50px;" src="https://github.com/user-attachments/assets/44aeb139-d457-4171-90a3-5bde0c1b9ff9" />
+<img weight= "1200" height="300" alt="image" style="border-radius: 100%;" src="https://github.com/user-attachments/assets/76057461-e1cb-4020-9f30-ffc522bdaefc" />
+
+* 캐시 적용 후
+<img weight= "1200" height="300" alt="image" src="https://github.com/user-attachments/assets/4a173b5e-aeee-44c0-be95-0d1b81f07f47" />
+
 
 
 
