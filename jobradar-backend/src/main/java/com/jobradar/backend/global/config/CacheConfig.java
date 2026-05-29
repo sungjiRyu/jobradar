@@ -16,9 +16,9 @@ import java.util.Map;
 /**
  * Redis 캐시 설정
  *
- * [캐시별 TTL 전략]
- * - 기술스택/지역/경력 통계: 10분 (자주 안 바뀜)
- * - 오늘의 현황: 1분 (신규 공고 등록 시 빠르게 반영 필요)
+ * [TTL 전략]
+ * 모든 캐시의 TTL은 24시간으로 설정
+ * 크롤링시 혹은 데이터 변경시 @CacheEvict 을 통해 refresh 한다
  *
  * [직렬화 방식]
  * - Spring Data Redis 4.0부터 Jackson 기반 직렬화기가 deprecated
