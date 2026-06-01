@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -75,6 +76,7 @@ public class Job {
 
     // 기술스택 다대다 관계 (job_post_stacks 중간 테이블로 연결)
     @ManyToMany(fetch = FetchType.LAZY)
+    @BatchSize(size = 10)
     @JoinTable(
             name = "job_post_stacks",
             joinColumns = @JoinColumn(name = "job_post_id"),
