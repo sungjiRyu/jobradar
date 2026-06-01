@@ -347,6 +347,7 @@ jobradar-frontend/
 **원인**
 
 `Scrap`과 `job` 엔티티가 `ManyToOne` 관계로 설정되어 있어 `scrap.getJob()`에 접근할 때마다 추가적인 SELECT 쿼리가 발생하는 N+1 문제가 있었습니다.
+
 **해결과정**
 
 * N+1문제를 해결하는 방법으로는 `@EntityGraph`와 `Fetch Join`가 있었습니다. 
