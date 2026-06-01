@@ -340,19 +340,35 @@ jobradar-frontend/
 ### 5. N+1 문제 해결
 
 **문제**
-스크랩 목록 조회 시 `show-sql` 로그에서 SQL이 N+1번 출력됨을 발견했습니다.
-스크랩 100개를 조회하면 Job SELECT 쿼리가 100번 추가 발생했습니다.
+스크랩 목록 조회(`/api/scraps`)와 공고목록 조회(`/api/jobs`)에서 N+1 문제를 확인했습니다.
+
+**5-1. 공고목록 조회(`/api/jobs`)**
 
 **원인**
-`Scrap.job` 필드가 `FetchType.LAZY`로 설정되어 있어
-루프에서 `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
+
+`Scrap`과 `job` entity가 `ManyToOne` 관계로 설정되어 있습니다. `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
 
 **해결**
+
+* N+1문제를 해결하는 방법으로는 `@EntityGraph`와 `Fetch Join`가 있었습니다. 
+* `@EntityGraph`는 left outer join 만을 지원하지만 현재 엔티티 구조상 문제가 없다고 판단했습니다. 가독성이 좀더 좋은 `@EntityGraph`을 선택했고 Eager Loading방식으로 데이터를 로드해서 N+1문제를 해결했습니다.
+
 ```java
-@Query("SELECT s FROM Scrap s JOIN FETCH s.job WHERE s.user.email = :email")
-List<Scrap> findAllByUserEmailWithJob(@Param("email") String email);
+    /**
+     * 사용자 이메일로 전체 스크랩 목록 조회
+     */
+    @EntityGraph(attributePaths = {"job"})
+    List<Scrap> findByUserEmailOrderByCreatedAtDesc(String email);
+
 ```
-쿼리 N+1번 → 1번으로 감소했습니다.
+
+**5-2. 공고 상세조회(`/api/jobs/{id}`)**
+
+**원인**
+
+`Scrap`과 `job` entity가 `ManyToOne` 관계로 설정되어 있습니다. `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
+
+**해결**
 
 ---
 <br>
