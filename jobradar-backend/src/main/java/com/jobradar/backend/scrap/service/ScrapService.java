@@ -98,10 +98,10 @@ public class ScrapService {
 
         if (status != null) {
             // 상태별 필터 조회 (예: PENDING만 보기)
-            scraps = scrapRepository.findAllByUserEmailAndStatusWithJob(email, status);
+            scraps = scrapRepository.findByUserEmailAndStatusOrderByCreatedAtDesc(email, status);
         } else {
             // 전체 조회
-            scraps = scrapRepository.findAllByUserEmailWithJob(email);
+            scraps = scrapRepository.findByUserEmailOrderByCreatedAtDesc(email);
         }
 
         // Entity 리스트 → DTO 리스트 변환
