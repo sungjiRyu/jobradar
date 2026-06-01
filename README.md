@@ -342,13 +342,12 @@ jobradar-frontend/
 **문제**
 스크랩 목록 조회(`/api/scraps`)와 공고목록 조회(`/api/jobs`)에서 N+1 문제를 확인했습니다.
 
-**5-1. 공고목록 조회(`/api/jobs`)**
+**5-1. 스크랩 목록 조회**
 
 **원인**
 
-`Scrap`과 `job` entity가 `ManyToOne` 관계로 설정되어 있습니다. `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
-
-**해결**
+`Scrap`과 `job` 엔티티가 `ManyToOne` 관계로 설정되어 있어 `scrap.getJob()`에 접근할 때마다 추가적인 SELECT 쿼리가 발생하는 N+1 문제가 있었습니다.
+**해결과정**
 
 * N+1문제를 해결하는 방법으로는 `@EntityGraph`와 `Fetch Join`가 있었습니다. 
 * `@EntityGraph`는 left outer join 만을 지원하지만 현재 엔티티 구조상 문제가 없다고 판단했습니다. 가독성이 좀더 좋은 `@EntityGraph`을 선택했고 Eager Loading방식으로 데이터를 로드해서 N+1문제를 해결했습니다.
@@ -362,13 +361,23 @@ jobradar-frontend/
 
 ```
 
-**5-2. 공고 상세조회(`/api/jobs/{id}`)**
+**5-2. 공고목록 조회**
 
 **원인**
 
-`Scrap`과 `job` entity가 `ManyToOne` 관계로 설정되어 있습니다. `scrap.getJob()` 접근 시마다 SELECT 쿼리가 발생했습니다.
+`job`과 `techStack` 엔티티가 ManyToMany 관계로 설정되어 있어, `job.getTechStacks()`에 접근할 때마다 추가적인 SELECT 쿼리가 발생하는 N+1 문제가 있었습니다.
 
-**해결**
+**해결과정**
+
+* 처음에는 `@EntityGraph(Fetch Join)`를 사용하여 문제를 해결하려 했으나, 이전보다 눈에 띄게 속도가 느려지고 로그에 HHH90003004: firstResult/maxResults specified with collection fetch; applying in memory라는 경고가 발생하는 것을 확인했습니다.
+
+* 해당 경고는 DB가 아닌 애플리케이션 메모리에서 쿼리 결과를 전부 가져온 뒤 페이징 작업을 수행하기 때문에 OOM(Out of Memory)이 발생할 수 있다는 의미였습니다. 실제로 쿼리 로그에서 LIMIT 절이 사라진 것을 확인했습니다.
+
+* 이는 `@EntityGraph`가 DB 관점에서는 조인(JOIN)이기 때문입니다. 컬렉션을 조인하면 쿼리의 결과 수(Row)가 부풀려집니다. (예: 하나의 공고에 3개의 기술 스택이 있다면 총 3개의 Row가 생성됨). 이 상태에서 LIMIT를 통해 페이징을 적용하면 데이터가 중간에 잘리게 되므로, JPA는 이를 막기 위해 모든 데이터를 메모리에 적재한 뒤 중복을 제거하고 페이징하는 과정을 거칩니다.
+
+* 따라서 대안으로 하이버네이트 공식 문서에서 권장하는 `@BatchSize`를 도입했습니다. `@BatchSize`는 지연 로딩(Lazy Loading) 시 발생하는 단일 쿼리들을 IN 절을 이용해 지정된 크기(Size)만큼 묶어서 한 번에 조회하게 해줍니다.
+
+* 이 방식은 부모 엔티티를 페이징하여 먼저 가져온 후, 필요에 따라 자식 엔티티를 묶어서 가져오는 원리를 따르기 때문에 LIMIT 절도 정상적으로 동작합니다. 결과적으로 `job`엔티티에 `@BatchSize`를 적용하여 N+1 문제를 해결했습니다.
 
 ---
 <br>
