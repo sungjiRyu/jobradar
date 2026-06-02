@@ -13,9 +13,13 @@
 
 <details>
  <summary> 📋 Version History</summary>
- 
+
+### v1.03 (2026-06-03)
+ -  [fix] api 중복호출 및 캐시 스탬피드 방어로직 작성
+### v1.02 (2026-06-02)
+- [fix] N+1 문제 해결
 ### v1.0.1 (2026-05-24)
-- favicon 디자인 변경 및 브라우저/기기별 대응 추가
+- [chore] favicon 디자인 변경 및 브라우저/기기별 대응 추가
   - SVG, ICO, PNG 멀티포맷 적용
   - iOS 홈 화면, Android PWA 아이콘 지원
   - site.webmanifest 설정 (theme_color: #378ADD)
