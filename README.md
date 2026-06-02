@@ -310,8 +310,8 @@ jobradar-frontend/
 * **redisson(분산 락)**: Redis를 기반으로 분산 락을 지원하는 라이브러리입니다. 다중 서버 환경에서 데이터 동기화를 보장하는 데 강력하지만, 추가적인 인프라 구성과 코드 복잡도가 증가합니다.
 * **@Cacheable(sync = true)(로컬 락)**: `Spring Cache`가 제공하는 기능으로, '동일한 캐시 키'를 요청하는 스레드에 대해 동기화를 보장합니다. JVM 메모리 내부에서 작동하는 로컬 락 방식으로 동작합니다.니다.
 
-@Cacheable(sync = true)를 선택했습니다.
-현재 서비스 아키텍처는 EC2 한 대에서 구동되는 단일 서버(Single JVM) 구조입니다. 구현이 간결하면서도 단일 서버 환경에서 동시성 제어가 가능한 @Cacheable(sync = true)가 적합하다고 판단했습니다.
+redisson을 선택했습니다.
+`@Cacheable(sync = true)`는 구현이 간결하나 단일 인스턴스에서만 작동합니다. 확장성 면에서 redisson이 이점이 있다고 판단했습니다.
 
 #### 4-5. 결과
 
@@ -403,13 +403,12 @@ spring에서 동시성을 제어하는 방법에 대해 찾아보았습니다.
 
 * 비관적 락 : 트랜젝션 시작시 DB에 직접 락을 거는 방법입니다. 가장 확실하지만 지금처럼 외부 API 호출이 있다면 트래픽이 몰릴경우 DB커넥션풀이 금방 고갈될 수 있기 때문에 적합하지 않다고 생각했습니다.
 * 낙관적 락 : 버전을 통해 데이터의 정합성을 확보합니다. update 쿼리실행시 버전을 확인하고 버전이 맞지않는다면 exception을 발생시킵니다. 현재 데이터 정합성이 아니라 api의 중복호출이 문제이기 때문에 적합하지 않습니다.}
-* synchronized : spring에서 지원하는 동시성 제어 기능입니다. 인스턴스 단위로 락을 제어합니다
+* synchronized : spring에서 지원하는 동시성 제어 기능입니다. 인스턴스 단위로 락을 제어하기 때문에 단일 서버에서 적합합니다.
 * redis 락 : redis를 사용해서 락을 구현합니다. 분산환경에 적합합니다.
 
-확장성을 고려해 redis의 redisson을 사용해서 락을 구현했습니다.
+추후 확장성을 고려해서 redis의 redisson 라이브러리를 사용해 락을 구현했습니다.
 
-
-
+- [JobService.java](jobradar-backend/src/main/java/com/jobradar/backend/job/service/JobService.java)
 
 
 
