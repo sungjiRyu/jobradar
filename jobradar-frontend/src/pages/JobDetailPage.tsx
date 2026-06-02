@@ -42,6 +42,13 @@ interface JobSummaryJson {
   insight: { challenge: string | null; fit: string | null };
 }
 
+interface JobSummaryResponse {
+  summary: string | null;
+  imageOnly: boolean;
+  closed: boolean;
+  inProgress?: boolean;
+}
+
 // ─────────────────────────────────────────────
 // 유틸 함수 & 공통 컴포넌트
 // ─────────────────────────────────────────────
@@ -53,6 +60,11 @@ const parseSummary = (raw: string): JobSummaryJson | null => {
     return null;
   }
 };
+
+const LOCK_RETRY_DELAY_MS = 1500;
+const MAX_LOCK_RETRY_COUNT = 5;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * deadline(YYYY-MM-DD)이 오늘보다 이전인지 판단(T/F)
@@ -104,7 +116,12 @@ const JobDetailPage = () => {
   // descStatus: DB에서 읽어온 상태 + lazy fetch 결과로 업데이트됨
   // null = 아직 fetch 안 됨(또는 크롤링 실패), "CRAWL_FAILED" = 이번 방문에서 크롤링 실패
   const [descStatus, setDescStatus] = useState<
-    "SUCCESS" | "IMAGE" | "EXTERNAL" | "CRAWL_FAILED" | null
+    | "SUCCESS"
+    | "IMAGE"
+    | "EXTERNAL"
+    | "CRAWL_FAILED"
+    | "IN_PROGRESS"
+    | null
   >(null);
   const [aiSummaryFailed, setAiSummaryFailed] = useState(false); // AI 요약만 실패한 경우
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(
@@ -133,6 +150,46 @@ const JobDetailPage = () => {
     setDots("");
   };
 
+  const fetchDescriptionUntilReady = async () => {
+    for (let attempt = 0; attempt <= MAX_LOCK_RETRY_COUNT; attempt++) {
+      const descRes = await getJobDescription(Number(id));
+      const desc = descRes.data.data;
+
+      if (desc.status !== "IN_PROGRESS") {
+        return desc;
+      }
+
+      setDescStatus("IN_PROGRESS");
+      if (attempt < MAX_LOCK_RETRY_COUNT) {
+        await wait(LOCK_RETRY_DELAY_MS);
+      }
+    }
+
+    return { status: "IN_PROGRESS", description: null };
+  };
+
+  const fetchSummaryUntilReady = async (): Promise<JobSummaryResponse> => {
+    for (let attempt = 0; attempt <= MAX_LOCK_RETRY_COUNT; attempt++) {
+      const summaryRes = await getJobSummary(Number(id));
+      const data = summaryRes.data.data as JobSummaryResponse;
+
+      if (!data.inProgress) {
+        return data;
+      }
+
+      if (attempt < MAX_LOCK_RETRY_COUNT) {
+        await wait(LOCK_RETRY_DELAY_MS);
+      }
+    }
+
+    return {
+      summary: null,
+      imageOnly: false,
+      closed: false,
+      inProgress: true,
+    };
+  };
+
   // ── AI 요약 + description lazy fetch 흐름 ──────
   // initialStatus: DB에서 읽어온 descriptionStatus (SUCCESS면 description fetch 생략)
   const fetchSummaryFlow = async (initialStatus: "SUCCESS" | null) => {
@@ -144,11 +201,14 @@ const JobDetailPage = () => {
       if (initialStatus === null) {
         // DB에 description이 없음 → 백엔드에서 lazy fetch 실행
         setLoadingStatus("crawling");
-        const descRes = await getJobDescription(Number(id));
-        const desc = descRes.data.data;
+        const desc = await fetchDescriptionUntilReady();
 
         if (desc.status === "CRAWL_FAILED") {
           setDescStatus("CRAWL_FAILED");
+          return;
+        }
+        if (desc.status === "IN_PROGRESS") {
+          setAiSummaryFailed(true);
           return;
         }
         if (desc.status === "IMAGE") {
@@ -161,11 +221,12 @@ const JobDetailPage = () => {
 
       // description 있음 → AI 요약 요청
       setLoadingStatus("ai");
-      const summaryRes = await getJobSummary(Number(id));
-      const data = summaryRes.data.data;
+      const data = await fetchSummaryUntilReady();
 
       if (data.summary) {
         setSummary(data.summary);
+      } else if (data.inProgress) {
+        setAiSummaryFailed(true);
       } else if (data.imageOnly) {
         // getSummary 내부 lazy fetch에서 IMAGE로 확인된 경우
         setDescStatus("IMAGE");
@@ -188,10 +249,13 @@ const JobDetailPage = () => {
     setLoadingStatus("ai");
 
     try {
-      const summaryRes = await getJobSummary(Number(id));
-      const data = summaryRes.data.data;
+      const data = await fetchSummaryUntilReady();
       if (data.summary) {
         setSummary(data.summary);
+      } else if (data.inProgress) {
+        setAiSummaryFailed(true);
+      } else if (data.imageOnly) {
+        setDescStatus("IMAGE");
       } else {
         setAiSummaryFailed(true);
       }

@@ -3,6 +3,7 @@ package com.jobradar.backend.job.service;
 import com.jobradar.backend.crawler.JobkoreaCrawlerService;
 import com.jobradar.backend.crawler.SaraminCrawlerService;
 import com.jobradar.backend.global.config.AiSummaryService;
+import com.jobradar.backend.global.lock.LockAcquisitionException;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
 import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.SummaryResponse;
@@ -76,6 +77,18 @@ class JobServiceTest {
         @Override
         public synchronized <T> T executeWithLock(String key, Supplier<T> task) {
             return task.get();
+        }
+    }
+
+    private static class ThrowingRedisLockExecutor extends RedisLockExecutor {
+
+        ThrowingRedisLockExecutor() {
+            super(null);
+        }
+
+        @Override
+        public <T> T executeWithLock(String key, Supplier<T> task) {
+            throw new LockAcquisitionException("lock busy");
         }
     }
 
@@ -213,6 +226,70 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("description 락 획득 실패 - 아직 처리 중이면 CRAWL_FAILED 대신 IN_PROGRESS 반환")
+    void getDescription_락획득실패_진행중반환() {
+        jobService = new JobService(
+                jobRepository,
+                saraminCrawlerService,
+                jobkoreaCrawlerService,
+                aiSummaryService,
+                new ThrowingRedisLockExecutor()
+        );
+
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("락 경합 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/lock-busy")
+                .sourceSite("사람인")
+                .build();
+
+        given(jobRepository.findById(101L)).willReturn(Optional.of(job));
+
+        DescriptionResponse response = jobService.getDescription(101L);
+
+        assertThat(response.getStatus()).isEqualTo("IN_PROGRESS");
+        verify(saraminCrawlerService, never()).fetchDescription(any());
+    }
+
+    @Test
+    @DisplayName("description 락 획득 실패 - 재조회 상태가 IMAGE면 IMAGE 반환")
+    void getDescription_락획득실패_IMAGE반환() {
+        jobService = new JobService(
+                jobRepository,
+                saraminCrawlerService,
+                jobkoreaCrawlerService,
+                aiSummaryService,
+                new ThrowingRedisLockExecutor()
+        );
+
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("이미지 공고")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/image")
+                .sourceSite("사람인")
+                .build();
+        Job initiallyLoadedJob = Job.builder()
+                .company("테스트회사")
+                .title("이미지 공고")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/image")
+                .sourceSite("사람인")
+                .build();
+        job.updateDescription(null, Job.DescriptionStatus.IMAGE);
+
+        given(jobRepository.findById(102L))
+                .willReturn(Optional.of(initiallyLoadedJob))
+                .willReturn(Optional.of(job));
+
+        DescriptionResponse response = jobService.getDescription(102L);
+
+        assertThat(response.getStatus()).isEqualTo("IMAGE");
+        verify(saraminCrawlerService, never()).fetchDescription(any());
+    }
+
+    @Test
     @DisplayName("동시 요청 - Redisson Lock 경계로 AI 요약 1번만 호출됨")
     void getSummary_동시요청_AI요약1번만호출() throws InterruptedException {
         // given: description은 이미 수집됐지만 summary는 아직 없는 공고
@@ -260,5 +337,73 @@ class JobServiceTest {
 
         // then: 같은 공고 요약 요청이 겹쳐도 AI 호출은 1번만 수행됨
         verify(aiSummaryService, times(1)).summarize(any());
+    }
+
+    @Test
+    @DisplayName("summary 락 획득 실패 - 아직 처리 중이면 aiFailed 대신 inProgress 반환")
+    void getSummary_락획득실패_진행중반환() {
+        jobService = new JobService(
+                jobRepository,
+                saraminCrawlerService,
+                jobkoreaCrawlerService,
+                aiSummaryService,
+                new ThrowingRedisLockExecutor()
+        );
+
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("요약 락 경합 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-lock-busy")
+                .sourceSite("사람인")
+                .description("요약 대상 상세 내용")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+
+        given(jobRepository.findById(103L)).willReturn(Optional.of(job));
+
+        SummaryResponse response = jobService.getSummary(103L);
+
+        assertThat(response.isInProgress()).isTrue();
+        assertThat(response.getSummary()).isNull();
+        verify(aiSummaryService, never()).summarize(any());
+    }
+
+    @Test
+    @DisplayName("summary 락 획득 실패 - 재조회 상태가 IMAGE면 imageOnly 반환")
+    void getSummary_락획득실패_IMAGE반환() {
+        jobService = new JobService(
+                jobRepository,
+                saraminCrawlerService,
+                jobkoreaCrawlerService,
+                aiSummaryService,
+                new ThrowingRedisLockExecutor()
+        );
+
+        Job initiallyLoadedJob = Job.builder()
+                .company("테스트회사")
+                .title("이미지 요약")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-image")
+                .sourceSite("사람인")
+                .build();
+        Job imageJob = Job.builder()
+                .company("테스트회사")
+                .title("이미지 요약")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-image")
+                .sourceSite("사람인")
+                .descriptionStatus(Job.DescriptionStatus.IMAGE)
+                .build();
+
+        given(jobRepository.findById(104L))
+                .willReturn(Optional.of(initiallyLoadedJob))
+                .willReturn(Optional.of(imageJob));
+
+        SummaryResponse response = jobService.getSummary(104L);
+
+        assertThat(response.isImageOnly()).isTrue();
+        assertThat(response.isInProgress()).isFalse();
+        verify(aiSummaryService, never()).summarize(any());
     }
 }

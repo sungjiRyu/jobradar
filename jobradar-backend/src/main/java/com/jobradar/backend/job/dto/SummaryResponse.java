@@ -16,26 +16,32 @@ public class SummaryResponse {
     private final String summary;
     private final boolean imageOnly;
     private final boolean closed;
+    private final boolean inProgress;
 
-    private SummaryResponse(String summary, boolean imageOnly, boolean closed) {
+    private SummaryResponse(String summary, boolean imageOnly, boolean closed, boolean inProgress) {
         this.summary = summary;
         this.imageOnly = imageOnly;
         this.closed = closed;
+        this.inProgress = inProgress;
     }
 
     public static SummaryResponse success(String summary) {
-        return new SummaryResponse(summary, false, false);
+        return new SummaryResponse(summary, false, false, false);
     }
 
     public static SummaryResponse imageOnly() {
-        return new SummaryResponse(null, true, false);
+        return new SummaryResponse(null, true, false, false);
     }
 
     public static SummaryResponse aiFailed() {
-        return new SummaryResponse(null, false, false);
+        return new SummaryResponse(null, false, false, false);
     }
 
     public static SummaryResponse closed() {
-        return new SummaryResponse(null, false, true);
+        return new SummaryResponse(null, false, true, false);
+    }
+
+    public static SummaryResponse inProgress() {
+        return new SummaryResponse(null, false, false, true);
     }
 }

@@ -42,4 +42,8 @@ public class DescriptionResponse {
     public static DescriptionResponse closed() {
         return new DescriptionResponse("CLOSED", null);
     }
+
+    public static DescriptionResponse inProgress() {
+        return new DescriptionResponse("IN_PROGRESS", null);
+    }
 }
