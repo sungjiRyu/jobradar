@@ -47,7 +47,7 @@ public class CrawlerScheduler {
      * 일별 크롤링(runCrawling)과 시각이 같지만 요일 조건으로 분리됨
      * cron: 초 분 시 일 월 요일 (1=일요일, 2=월요일, ... 7=토요일)
      */
-    @Scheduled(cron = "0 0 3 * * 2")
+    @Scheduled(cron = "0 0 3 * * 2", zone = "Asia/Seoul")
     public void runAlwaysOpenCheck() {
         log.info("===== 상시채용 유효성 검사 시작 =====");
         alwaysOpenCheckService.checkAll();
@@ -58,7 +58,7 @@ public class CrawlerScheduler {
      * cron 표현식: 매일 새벽 3시 정각 실행 (JVM 타임존 Asia/Seoul 기준)
      * [주의] @EnableScheduling이 main 클래스에 있어야 동작함
      */
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
     @CacheEvict(cacheNames = {
         CacheConfig.CACHE_TECH_STACKS,
         CacheConfig.CACHE_LOCATIONS,
@@ -89,7 +89,7 @@ public class CrawlerScheduler {
      * 크롤링(03:00)과 분리하여, 사용자가 새 날짜 진입 직후부터
      * 만료 공고를 보지 않도록 보장한다.
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     @CacheEvict(cacheNames = {
         CacheConfig.CACHE_TECH_STACKS,
         CacheConfig.CACHE_LOCATIONS,
