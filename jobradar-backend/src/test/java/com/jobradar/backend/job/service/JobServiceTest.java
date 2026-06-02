@@ -3,19 +3,22 @@ package com.jobradar.backend.job.service;
 import com.jobradar.backend.crawler.JobkoreaCrawlerService;
 import com.jobradar.backend.crawler.SaraminCrawlerService;
 import com.jobradar.backend.global.config.AiSummaryService;
+import com.jobradar.backend.global.lock.RedisLockExecutor;
 import com.jobradar.backend.job.dto.DescriptionResponse;
+import com.jobradar.backend.job.dto.SummaryResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,8 +54,30 @@ class JobServiceTest {
     @Mock
     private AiSummaryService aiSummaryService;
 
-    @InjectMocks
     private JobService jobService;
+
+    @BeforeEach
+    void setUp() {
+        jobService = new JobService(
+                jobRepository,
+                saraminCrawlerService,
+                jobkoreaCrawlerService,
+                aiSummaryService,
+                new SynchronizedRedisLockExecutor()
+        );
+    }
+
+    private static class SynchronizedRedisLockExecutor extends RedisLockExecutor {
+
+        SynchronizedRedisLockExecutor() {
+            super(null);
+        }
+
+        @Override
+        public synchronized <T> T executeWithLock(String key, Supplier<T> task) {
+            return task.get();
+        }
+    }
 
     // ===== getDescription() 분기 테스트 =====
 
@@ -131,10 +156,10 @@ class JobServiceTest {
         verify(saraminCrawlerService).fetchDescription("https://www.saramin.co.kr/test3");
     }
 
-    // ===== Striped Locking 동시성 테스트 =====
+    // ===== Redisson 분산락 동시성 테스트 =====
 
     @Test
-    @DisplayName("동시 요청 - Striped Lock으로 크롤러 1번만 호출됨")
+    @DisplayName("동시 요청 - Redisson Lock 경계로 크롤러 1번만 호출됨")
     void getDescription_동시요청_크롤러1번만호출() throws InterruptedException {
         // given: 미수집 공고 (descriptionStatus = null)
         Job job = Job.builder()
@@ -185,5 +210,55 @@ class JobServiceTest {
         // then: 크롤러는 딱 1번만 호출됨
         // 락이 없었다면 5개 스레드 모두 status=null을 읽고 각자 크롤링 → times(5) 실패
         verify(saraminCrawlerService, times(1)).fetchDescription(any());
+    }
+
+    @Test
+    @DisplayName("동시 요청 - Redisson Lock 경계로 AI 요약 1번만 호출됨")
+    void getSummary_동시요청_AI요약1번만호출() throws InterruptedException {
+        // given: description은 이미 수집됐지만 summary는 아직 없는 공고
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("AI 요약 동시성 테스트용 공고")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-concurrent")
+                .sourceSite("사람인")
+                .description("AI 요약 테스트를 위해 충분히 긴 상세 내용입니다. 주요업무와 자격요건이 포함된 텍스트라고 가정합니다.")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+
+        int threadCount = 5;
+
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+
+        given(jobRepository.findById(100L)).willReturn(Optional.of(job));
+        given(aiSummaryService.summarize(any())).willAnswer(invocation -> {
+            Thread.sleep(50);
+            return "{\"header\":{\"summary\":\"요약 결과\"}}";
+        });
+
+        // when: 5개 스레드 동시 출발
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    SummaryResponse response = jobService.getSummary(100L);
+                    assertThat(response.getSummary()).isNotNull();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    doneLatch.countDown();
+                }
+            }).start();
+        }
+
+        readyLatch.await();
+        startLatch.countDown();
+        doneLatch.await(5, TimeUnit.SECONDS);
+
+        // then: 같은 공고 요약 요청이 겹쳐도 AI 호출은 1번만 수행됨
+        verify(aiSummaryService, times(1)).summarize(any());
     }
 }
