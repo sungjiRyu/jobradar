@@ -1,27 +1,34 @@
 package com.jobradar.backend.stats.service;
 
+import com.jobradar.backend.global.cache.DistributedCacheLoader;
+import com.jobradar.backend.global.config.CacheConfig;
+import com.jobradar.backend.global.lock.RedisLockExecutor;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
 import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
 import com.jobradar.backend.stats.repository.StatsRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * StatsService 단위 테스트
@@ -42,8 +49,33 @@ class StatsServiceTest {
     @Mock
     private StatsRepository statsRepository;
 
-    @InjectMocks
     private StatsService statsService;
+
+    @BeforeEach
+    void setUp() {
+        DistributedCacheLoader cacheLoader = new DistributedCacheLoader(
+                new ConcurrentMapCacheManager(
+                        CacheConfig.CACHE_TECH_STACKS,
+                        CacheConfig.CACHE_LOCATIONS,
+                        CacheConfig.CACHE_TODAY,
+                        CacheConfig.CACHE_EXPERIENCE
+                ),
+                new SynchronizedRedisLockExecutor()
+        );
+        statsService = new StatsService(statsRepository, cacheLoader);
+    }
+
+    private static class SynchronizedRedisLockExecutor extends RedisLockExecutor {
+
+        SynchronizedRedisLockExecutor() {
+            super(null);
+        }
+
+        @Override
+        public synchronized <T> T executeWithLock(String key, Supplier<T> task) {
+            return task.get();
+        }
+    }
 
     // ===== 기술스택 통계 테스트 =====
 
@@ -65,6 +97,27 @@ class StatsServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getName()).isEqualTo("Java");
         assertThat(result.get(0).getCount()).isEqualTo(924L);
+    }
+
+    @Test
+    @DisplayName("기술스택 통계 - 캐시 적중 시 Repository를 다시 호출하지 않음")
+    void getTechStackStats_캐시적중_repository재호출없음() {
+        // given
+        List<TechStackStatResponse> mockData = List.of(
+                new TechStackStatResponse("Java", 924L)
+        );
+        given(statsRepository.findTechStackStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(PageRequest.class)))
+                .willReturn(mockData);
+
+        // when
+        List<TechStackStatResponse> first = statsService.getTechStackStats();
+        List<TechStackStatResponse> second = statsService.getTechStackStats();
+
+        // then
+        assertThat(first).hasSize(1);
+        assertThat(second).hasSize(1);
+        verify(statsRepository, times(1))
+                .findTechStackStats(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(PageRequest.class));
     }
 
     @Test

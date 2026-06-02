@@ -1,5 +1,6 @@
 package com.jobradar.backend.stats.service;
 
+import com.jobradar.backend.global.cache.DistributedCacheLoader;
 import com.jobradar.backend.global.config.CacheConfig;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
@@ -8,7 +9,6 @@ import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
 import com.jobradar.backend.stats.repository.StatsRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,16 +25,21 @@ import java.util.List;
 @Transactional(readOnly = true) // 통계는 조회 전용이므로 readOnly로 성능 최적화
 public class StatsService {
 
+    private static final String CACHE_KEY_ALL = "all";
+
     private final StatsRepository statsRepository;
+    private final DistributedCacheLoader cacheLoader;
 
     /**
      * 기술스택별 공고 수 (상위 8개)
      *
-     * @Cacheable: 캐시 이름 = "stats:tech-stacks", key = "all" (고정값)
-     * TTL 24시간
+     * Redisson 분산락 기반 cache-aside 로딩
      */
-    @Cacheable(value = CacheConfig.CACHE_TECH_STACKS, key = "'all'", sync = true)
     public List<TechStackStatResponse> getTechStackStats() {
+        return cacheLoader.getOrLoad(CacheConfig.CACHE_TECH_STACKS, CACHE_KEY_ALL, this::loadTechStackStats);
+    }
+
+    private List<TechStackStatResponse> loadTechStackStats() {
         // PageRequest.of(0, 8): 첫 번째 페이지, 8개 제한 → SQL LIMIT 8 역할
         return statsRepository.findTechStackStats(Job.JobStatus.ACTIVE, LocalDate.now(), PageRequest.of(0, 8));
     }
@@ -42,11 +47,14 @@ public class StatsService {
     /**
      * 지역별 공고 수 + 비중(%)
      *
-     * @Cacheable: TTL 24시간
+     * Redisson 분산락 기반 cache-aside 로딩
      * percentage는 전체 합산이 필요하므로 서비스에서 계산
      */
-    @Cacheable(value = CacheConfig.CACHE_LOCATIONS, key = "'all'", sync = true)
     public List<LocationStatResponse> getLocationStats() {
+        return cacheLoader.getOrLoad(CacheConfig.CACHE_LOCATIONS, CACHE_KEY_ALL, this::loadLocationStats);
+    }
+
+    private List<LocationStatResponse> loadLocationStats() {
         List<LocationStatResponse> stats = statsRepository.findLocationStats(Job.JobStatus.ACTIVE, LocalDate.now());
 
         // 전체 공고 수 합산
@@ -63,10 +71,13 @@ public class StatsService {
     /**
      * 오늘의 현황 (전체/신규/마감임박/신입 공고 수)
      *
-     * @Cacheable: TTL 24시간
+     * Redisson 분산락 기반 cache-aside 로딩
      */
-    @Cacheable(value = CacheConfig.CACHE_TODAY, key = "'all'", sync = true)
     public TodayStatResponse getTodayStats() {
+        return cacheLoader.getOrLoad(CacheConfig.CACHE_TODAY, CACHE_KEY_ALL, this::loadTodayStats);
+    }
+
+    private TodayStatResponse loadTodayStats() {
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();           // 오늘 00:00:00
         LocalDateTime endOfDay = today.plusDays(1).atStartOfDay(); // 내일 00:00:00
@@ -82,10 +93,13 @@ public class StatsService {
     /**
      * 경력별 공고 수 + 비중(%)
      *
-     * @Cacheable: TTL 24시간
+     * Redisson 분산락 기반 cache-aside 로딩
      */
-    @Cacheable(value = CacheConfig.CACHE_EXPERIENCE, key = "'all'", sync = true)
     public List<ExperienceStatResponse> getExperienceStats() {
+        return cacheLoader.getOrLoad(CacheConfig.CACHE_EXPERIENCE, CACHE_KEY_ALL, this::loadExperienceStats);
+    }
+
+    private List<ExperienceStatResponse> loadExperienceStats() {
         List<ExperienceStatResponse> stats = statsRepository.findExperienceStats(Job.JobStatus.ACTIVE, LocalDate.now());
 
         long total = stats.stream().mapToLong(ExperienceStatResponse::getCount).sum();
