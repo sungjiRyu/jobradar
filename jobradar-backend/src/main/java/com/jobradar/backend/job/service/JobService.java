@@ -5,6 +5,8 @@ import com.jobradar.backend.crawler.SaraminCrawlerService;
 import com.jobradar.backend.global.config.AiSummaryService;
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.global.lock.LockAcquisitionException;
+import com.jobradar.backend.global.lock.RedisLockExecutor;
 import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
@@ -24,7 +26,6 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
@@ -35,22 +36,11 @@ public class JobService {
     private final SaraminCrawlerService saraminCrawlerService;
     private final JobkoreaCrawlerService jobkoreaCrawlerService;
     private final AiSummaryService aiSummaryService;
+    private final RedisLockExecutor redisLockExecutor;
 
-    // Striped Locking: 256개 락을 미리 생성해두고 jobId를 해시로 매핑
-    // 같은 공고에 동시 요청이 오면 같은 락에 걸려 직렬화됨
-    // 서로 다른 공고는 대부분 다른 락 → 불필요한 경합 없음
-    private static final int STRIPE_COUNT = 256;
-    private static final ReentrantLock[] STRIPE_LOCKS = new ReentrantLock[STRIPE_COUNT];
-
-    static {
-        for (int i = 0; i < STRIPE_COUNT; i++) {
-            STRIPE_LOCKS[i] = new ReentrantLock();
-        }
-    }
-
-    private ReentrantLock getStripeLock(Long jobId) {
-        // jobId를 256개 중 하나의 락으로 매핑 (비트 AND: STRIPE_COUNT가 2의 거듭제곱일 때 균등 분산)
-        return STRIPE_LOCKS[(int)(jobId & (STRIPE_COUNT - 1))];
+    // getDescription()과 getSummary()가 같은 공고 기준으로 락을 공유
+    private String jobLockKey(Long jobId) {
+        return "jobradar:lock:job:" + jobId;
     }
 
     /**
@@ -103,7 +93,6 @@ public class JobService {
         return JobDetailResponse.from(job);
     }
 
-    @Transactional
     public DescriptionResponse getDescription(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
@@ -111,11 +100,7 @@ public class JobService {
         // 1단계: 이미 수집된 경우 락 없이 즉시 반환 (대부분의 요청은 여기서 끝남)
         Job.DescriptionStatus status = job.getDescriptionStatus();
         if (status != null) {
-            return switch (status) {
-                case SUCCESS  -> DescriptionResponse.success(job.getDescription());
-                case IMAGE    -> DescriptionResponse.image();
-                case EXTERNAL -> DescriptionResponse.external();
-            };
+            return descriptionResponseFrom(job);
         }
 
         // 마감된 공고 + description 미수집 → 크롤링 안 함 (비용 절감)
@@ -123,36 +108,48 @@ public class JobService {
             return DescriptionResponse.closed();
         }
 
-        // 2단계: status = null → 스트라이프 락으로 직렬화
-        // 같은 jobId를 가진 동시 요청들이 같은 락에 걸려 순서대로 처리됨
-        ReentrantLock lock = getStripeLock(jobId);
-        lock.lock();
         try {
-            // 3단계: 락 획득 후 재확인
-            // 기다리는 동안 앞선 요청이 이미 크롤링·저장을 완료했을 수 있음
+            // 락 획득 시도
+            return redisLockExecutor.executeWithLock(jobLockKey(jobId), () -> {
+                // 대기시간동안 데이터가 저장되었을 수 있기 때문에 DB 재조회 
+                Job lockedJob = jobRepository.findById(jobId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+
+                Job.DescriptionStatus lockedStatus = lockedJob.getDescriptionStatus();
+                if (lockedStatus != null) {
+                    return descriptionResponseFrom(lockedJob);
+                }
+                if (isClosed(lockedJob)) {
+                    return DescriptionResponse.closed();
+                }
+
+                // 실제 크롤링 실행 (같은 jobId에 대해서는 전체 동시 요청 중 1번만 실행)
+                DescriptionResponse result = fetchDescriptionBySourceSite(lockedJob);
+                if (!"CRAWL_FAILED".equals(result.getStatus())) {
+                    lockedJob.updateDescription(result.getDescription(), mapStatus(result.getStatus()));
+                    jobRepository.save(lockedJob);
+                }
+                log.info("[JobService] lazy fetch 완료: jobId={}, status={}", jobId, result.getStatus());
+                return result;
+            });
+        } catch (LockAcquisitionException e) {
+            log.warn("[JobService] description lock 획득 실패: jobId={}, error={}", jobId, e.getMessage());
             job = jobRepository.findById(jobId)
                     .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
             status = job.getDescriptionStatus();
             if (status != null) {
-                return switch (status) {
-                    case SUCCESS  -> DescriptionResponse.success(job.getDescription());
-                    case IMAGE    -> DescriptionResponse.image();
-                    case EXTERNAL -> DescriptionResponse.external();
-                };
+                return descriptionResponseFrom(job);
             }
-
-            // 4단계: 실제 크롤링 실행 (전체 동시 요청 중 딱 1번만 실행됨)
-            // CRAWL_FAILED는 DB에 저장하지 않음 → null 유지 → 다음 방문 시 재시도
-            DescriptionResponse result = fetchDescriptionBySourceSite(job);
-            if (!"CRAWL_FAILED".equals(result.getStatus())) {
-                job.updateDescription(result.getDescription(), mapStatus(result.getStatus()));
-            }
-            log.info("[JobService] lazy fetch 완료: jobId={}, status={}", jobId, result.getStatus());
-            return result;
-
-        } finally {
-            lock.unlock();
+            return DescriptionResponse.crawlFailed();
         }
+    }
+
+    private DescriptionResponse descriptionResponseFrom(Job job) {
+        return switch (job.getDescriptionStatus()) {
+            case SUCCESS  -> DescriptionResponse.success(job.getDescription());
+            case IMAGE    -> DescriptionResponse.image();
+            case EXTERNAL -> DescriptionResponse.external();
+        };
     }
 
     /**
@@ -276,7 +273,6 @@ public class JobService {
         return status;
     }
 
-    @Transactional
     public SummaryResponse getSummary(Long jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
@@ -291,6 +287,34 @@ public class JobService {
             return SummaryResponse.closed();
         }
 
+        Job.DescriptionStatus status = job.getDescriptionStatus();
+        if (status == Job.DescriptionStatus.IMAGE) return SummaryResponse.imageOnly();
+        if (status == Job.DescriptionStatus.EXTERNAL) return SummaryResponse.aiFailed();
+
+        try {
+            return redisLockExecutor.executeWithLock(jobLockKey(jobId), () -> generateSummaryUnderLock(jobId));
+        } catch (LockAcquisitionException e) {
+            log.warn("[JobService] summary lock 획득 실패: jobId={}, error={}", jobId, e.getMessage());
+            job = jobRepository.findById(jobId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+            if (job.getSummary() != null) {
+                return SummaryResponse.success(job.getSummary());
+            }
+            return SummaryResponse.aiFailed();
+        }
+    }
+
+    private SummaryResponse generateSummaryUnderLock(Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
+
+        if (job.getSummary() != null) {
+            return SummaryResponse.success(job.getSummary());
+        }
+        if (isClosed(job)) {
+            return SummaryResponse.closed();
+        }
+
         // descriptionStatus 기반 분기
         // null(기존 데이터)이면 lazy fetch 후 status 결정
         Job.DescriptionStatus status = job.getDescriptionStatus();
@@ -300,6 +324,7 @@ public class JobService {
             if (!"CRAWL_FAILED".equals(descResp.getStatus())) {
                 status = mapStatus(descResp.getStatus());
                 job.updateDescription(descResp.getDescription(), status);
+                jobRepository.save(job);
             }
             log.info("[JobService] lazy fetch 완료 (summary용): jobId={}, status={}", jobId, descResp.getStatus());
             if (status == null) {
@@ -315,6 +340,7 @@ public class JobService {
             String summary = aiSummaryService.summarize(job.getDescription());
             if (summary != null) {
                 job.updateSummary(summary);
+                jobRepository.save(job);
                 log.info("[JobService] AI 요약 완료: jobId={}", jobId);
                 return SummaryResponse.success(summary);
             }
