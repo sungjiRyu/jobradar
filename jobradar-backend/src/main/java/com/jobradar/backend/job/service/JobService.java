@@ -136,12 +136,18 @@ public class JobService {
             log.warn("[JobService] description lock 획득 실패: jobId={}, error={}", jobId, e.getMessage());
             job = jobRepository.findById(jobId)
                     .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
-            status = job.getDescriptionStatus();
-            if (status != null) {
-                return descriptionResponseFrom(job);
-            }
-            return DescriptionResponse.crawlFailed();
+            return descriptionResponseAfterLockContention(job);
         }
+    }
+
+    private DescriptionResponse descriptionResponseAfterLockContention(Job job) {
+        if (job.getDescriptionStatus() != null) {
+            return descriptionResponseFrom(job);
+        }
+        if (isClosed(job)) {
+            return DescriptionResponse.closed();
+        }
+        return DescriptionResponse.inProgress();
     }
 
     private DescriptionResponse descriptionResponseFrom(Job job) {
@@ -297,11 +303,23 @@ public class JobService {
             log.warn("[JobService] summary lock 획득 실패: jobId={}, error={}", jobId, e.getMessage());
             job = jobRepository.findById(jobId)
                     .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
-            if (job.getSummary() != null) {
-                return SummaryResponse.success(job.getSummary());
-            }
-            return SummaryResponse.aiFailed();
+            return summaryResponseAfterLockContention(job);
         }
+    }
+
+    private SummaryResponse summaryResponseAfterLockContention(Job job) {
+        if (job.getSummary() != null) {
+            return SummaryResponse.success(job.getSummary());
+        }
+        if (isClosed(job)) {
+            return SummaryResponse.closed();
+        }
+
+        Job.DescriptionStatus status = job.getDescriptionStatus();
+        if (status == Job.DescriptionStatus.IMAGE) return SummaryResponse.imageOnly();
+        if (status == Job.DescriptionStatus.EXTERNAL) return SummaryResponse.aiFailed();
+
+        return SummaryResponse.inProgress();
     }
 
     private SummaryResponse generateSummaryUnderLock(Long jobId) {
