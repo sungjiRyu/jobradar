@@ -96,37 +96,40 @@
 <details>
 <summary>🗂 프로젝트 구조</summary>
 
-### Backend
-```
-jobradar-backend/
-├── src/main/java/com/jobradar/backend/
-│   ├── auth/              # 인증 (로그인, 로그아웃, 토큰 재발급)
-│   │   ├── controller/
-│   │   ├── service/
-│   │   └── dto/
-│   ├── user/              # 회원
-│   ├── job/               # 채용공고
-│   ├── scrap/             # 스크랩
-│   ├── stats/             # 대시보드 통계
-│   ├── crawler/           # 크롤러 (Saramin Jsoup  + Jobkorea Jsoup)
-│   └── global/            # 공통 (Security, Redis, Exception)
-└── src/test/              # 단위 테스트
-```
-
-### Frontend
-```
 jobradar-frontend/
 ├── src/
-│   ├── pages/             # 페이지 (JobList, Dashboard, MyPage 등)
+│   ├── pages/             # 페이지
+│   │   ├── JobListPage
+│   │   ├── JobDetailPage
+│   │   ├── DashboardPage
+│   │   ├── MyPage
+│   │   ├── EditProfilePage
+│   │   ├── LoginPage
+│   │   ├── SignupPage
+│   │   ├── VerifyPasswordPage
+│   │   └── NotFoundPage
 │   ├── components/        # 재사용 컴포넌트
-│   │   ├── common/        # PrivateRoute 등
-│   │   ├── job/           # JobCard, JobFilter, SearchBar
-│   │   └── layout/        # Navbar, Sidebar
-│   ├── api/               # API 함수 (authApi, jobApi, scrapApi 등)
-│   ├── hooks/             # 커스텀 훅 (useAuth)
-│   ├── store/             # Zustand (authStore)
-│   └── router/            # 라우터 설정
-```
+│   │   ├── common/        # PrivateRoute, PolicyModal
+│   │   ├── job/           # JobCard, SearchFilter, Pagination
+│   │   └── layout/        # Navbar, Sidebar, Footer
+│   ├── api/               # API 함수
+│   │   ├── axios
+│   │   ├── authApi
+│   │   ├── jobApi
+│   │   ├── scrapApi
+│   │   ├── statsApi
+│   │   └── userApi
+│   ├── hooks/             # 커스텀 훅
+│   │   ├── useAuth
+│   │   ├── useScrap
+│   │   └── usePageTitle
+│   ├── store/             # Zustand 상태 관리
+│   │   └── authStore
+│   ├── router/            # 라우터 설정
+│   ├── mocks/             # 목 데이터
+│   ├── utils/             # 유틸 함수
+│   └── assets/            # 정적 에셋
+└── public/                # favicon, manifest 등 공개 리소스
 
 </details>
 
