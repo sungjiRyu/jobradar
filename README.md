@@ -133,38 +133,8 @@ jobradar-frontend/
 <details>
  <summary>🗄 ERD</summary>
 
-```
-┌──────────────┐         ┌─────────────────┐
-│    users     │         │   job_posts     │
-├──────────────┤         ├─────────────────┤
-│ id (PK)      │         │ id (PK)         │
-│ email (UK)   │         │ title           │
-│ password     │         │ company         │
-│ nickname     │         │ location        │
-│ role         │         │ experience      │
-└──────┬───────┘         │ deadline        │
-       │ 1:N             │ url             │
-       │                 │ view_count      │
-       ▼                 │ created_at      │
-┌──────────────┐         └─────────┬───────┘
-│    scraps    │                   │ 1:N
-├──────────────┤                   ▼
-│ id (PK)      │         ┌─────────────────┐
-│ user_id (FK) │←────────│ job_post_stacks │
-│ job_post_id  │         ├─────────────────┤
-│ status (EN)  │         │ id (PK)         │
-│ created_at   │         │ job_post_id(FK) │
-└──────────────┘         │ tech_stack_id   │
-                         └────────┬────────┘
-                                  │ N:1
-                                  ▼
-                         ┌─────────────────┐
-                         │  tech_stacks    │
-                         ├─────────────────┤
-                         │ id (PK)         │
-                         │ name (UK)       │
-                         └─────────────────┘
-```
+<img width="513" height="728" alt="image" src="https://github.com/user-attachments/assets/ae00b6e7-060e-4312-838f-a07fb5d9402d" />
+
 </details>
 
 <details>
@@ -429,7 +399,7 @@ spring에서 동시성을 제어하는 방법에 대해 찾아보았습니다.
 
 **원인**
 
-EC2, RDS, 애플리케이션의 타임존 기준이 명확히 일치하지 않았습니다.
+EC2 
 
 본 서비스는 공고 마감일, 오늘 등록된 공고, 통계 집계, 스케줄러 실행 시간을 한국 시간 기준으로 처리해야 합니다. 하지만 서버 또는 데이터베이스가 UTC 기준으로 동작하면 KST와 9시간 차이가 발생하여 `LocalDate.now()`, `CURRENT_DATE`, 스케줄러 cron 실행 시각이 의도와 다르게 동작할 수 있습니다.
 
