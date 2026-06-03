@@ -96,6 +96,7 @@
 <details>
 <summary>🗂 프로젝트 구조</summary>
 
+```
 jobradar-frontend/
 ├── src/
 │   ├── pages/             # 페이지
@@ -130,6 +131,7 @@ jobradar-frontend/
 │   ├── utils/             # 유틸 함수
 │   └── assets/            # 정적 에셋
 └── public/                # favicon, manifest 등 공개 리소스
+```
 
 </details>
 
