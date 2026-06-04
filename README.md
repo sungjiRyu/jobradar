@@ -138,10 +138,10 @@ jobradar-backend/
 │       │   │   ├── lock/
 │       │   │   └── security/
 │       │   └── JobradarBackendApplication
-│       └── resources/             # 애플리케이션 설정
-├── gradle/                        # Gradle Wrapper
-├── build.gradle                   # 빌드 설정
-├── settings.gradle                # 프로젝트 설정
+│       └── resources/             
+├── gradle/                        
+├── build.gradle                   
+├── settings.gradle                
 ├── gradlew
 └── gradlew.bat
 
