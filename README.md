@@ -313,7 +313,6 @@ jobradar-frontend/
 
 * 캐시 적용 전
 
-
 <img weight= "1200" height="300" alt="image" style="border-radius: 100%;" src="https://github.com/user-attachments/assets/76057461-e1cb-4020-9f30-ffc522bdaefc" />
 
 * 캐시 적용 후
@@ -373,7 +372,19 @@ Scrap과 Job은 ManyToOne 관계로 연결되어 있습니다. 스크랩 목록�
 
 * 결과적으로 Job의 techStacks 컬렉션에 `@BatchSize(size = 10)`을 적용했습니다. 공고 목록을 페이징하여 먼저 조회한 뒤, 지연 로딩되는 기술 스택 컬렉션을 공고 ID 기준의 `IN` 절로 묶어서 조회하도록 구성했습니다. 이를 통해 컬렉션 Fetch Join 사용 시 발생했던 메모리 페이징 문제를 피하면서, 기술 스택 조회 쿼리가 공고 수만큼 반복되는 N+1 문제를 완화했습니다.
 
+```java
+    @ManyToMany(fetch = FetchType.LAZY)
+    @BatchSize(size = 10)
+    @JoinTable(
+            name = "job_post_stacks",
+            joinColumns = @JoinColumn(name = "job_post_id"),
+            inverseJoinColumns = @JoinColumn(name = "tech_stack_id")
+    )
+    private List<TechStack> techStacks = new ArrayList<>();
+```
+
 ---
+
 <br>
 
 ### 6. lock 을 이용한 동시성 제어
