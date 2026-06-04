@@ -97,6 +97,57 @@
 <summary>🗂 프로젝트 구조</summary>
 
 ```
+jobradar-backend/
+├── src/
+│   └── main/
+│       ├── java/com/jobradar/backend/
+│       │   ├── auth/              # 인증/인가
+│       │   │   ├── controller/
+│       │   │   ├── dto/
+│       │   │   └── service/
+│       │   ├── user/              # 사용자 관리
+│       │   │   ├── controller/
+│       │   │   ├── dto/
+│       │   │   ├── entity/
+│       │   │   ├── repository/
+│       │   │   └── service/
+│       │   ├── job/               # 채용공고 관리
+│       │   │   ├── controller/
+│       │   │   ├── dto/
+│       │   │   ├── entity/
+│       │   │   ├── repository/
+│       │   │   └── service/
+│       │   ├── scrap/             # 채용공고 스크랩
+│       │   │   ├── controller/
+│       │   │   ├── dto/
+│       │   │   ├── entity/
+│       │   │   ├── repository/
+│       │   │   └── service/
+│       │   ├── stats/             # 통계 데이터
+│       │   │   ├── controller/
+│       │   │   ├── dto/
+│       │   │   ├── repository/
+│       │   │   └── service/
+│       │   ├── crawler/           # 채용공고 크롤링
+│       │   │   └── dto/
+│       │   ├── global/            # 전역 공통 기능
+│       │   │   ├── cache/
+│       │   │   ├── common/
+│       │   │   ├── config/
+│       │   │   ├── exception/
+│       │   │   ├── lock/
+│       │   │   └── security/
+│       │   └── JobradarBackendApplication
+│       └── resources/             # 애플리케이션 설정
+├── gradle/                        # Gradle Wrapper
+├── build.gradle                   # 빌드 설정
+├── settings.gradle                # 프로젝트 설정
+├── gradlew
+└── gradlew.bat
+
+```
+
+```
 jobradar-frontend/
 ├── src/
 │   ├── pages/             # 페이지
