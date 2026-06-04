@@ -99,78 +99,79 @@
 ```
 jobradar-backend/
 ├── src/
-│   └── main/
-│       ├── java/com/jobradar/backend/
-│       │   ├── auth/              # 인증/인가
-│       │   │   ├── controller/
-│       │   │   ├── dto/
-│       │   │   └── service/
-│       │   ├── user/              # 사용자 관리
-│       │   │   ├── controller/
-│       │   │   ├── dto/
-│       │   │   ├── entity/
-│       │   │   ├── repository/
-│       │   │   └── service/
-│       │   ├── job/               # 채용공고 관리
-│       │   │   ├── controller/
-│       │   │   ├── dto/
-│       │   │   ├── entity/
-│       │   │   ├── repository/
-│       │   │   └── service/
-│       │   ├── scrap/             # 채용공고 스크랩
-│       │   │   ├── controller/
-│       │   │   ├── dto/
-│       │   │   ├── entity/
-│       │   │   ├── repository/
-│       │   │   └── service/
-│       │   ├── stats/             # 통계 데이터
-│       │   │   ├── controller/
-│       │   │   ├── dto/
-│       │   │   ├── repository/
-│       │   │   └── service/
-│       │   ├── crawler/           # 채용공고 크롤링
-│       │   │   └── dto/
-│       │   ├── global/            # 전역 공통 기능
-│       │   │   ├── cache/
-│       │   │   ├── common/
-│       │   │   ├── config/
-│       │   │   ├── exception/
-│       │   │   ├── lock/
-│       │   │   └── security/
-│       │   └── JobradarBackendApplication
-│       └── resources/             
-├── gradle/                        
-├── build.gradle                   
-├── settings.gradle                
+│   ├── main/
+│   │   ├── java/com/jobradar/backend/
+│   │   │   ├── auth/              # 인증/인가
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   └── service/
+│   │   │   ├── user/              # 사용자 관리
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── entity/
+│   │   │   │   ├── repository/
+│   │   │   │   └── service/
+│   │   │   ├── job/               # 채용공고 관리
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── entity/
+│   │   │   │   ├── repository/
+│   │   │   │   └── service/
+│   │   │   ├── scrap/             # 채용공고 스크랩
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── entity/
+│   │   │   │   ├── repository/
+│   │   │   │   └── service/
+│   │   │   ├── stats/             # 통계 데이터
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── repository/
+│   │   │   │   └── service/
+│   │   │   ├── crawler/           # 채용공고 크롤링
+│   │   │   │   └── dto/
+│   │   │   ├── global/            # 전역 공통 기능
+│   │   │   │   ├── ai/
+│   │   │   │   ├── cache/
+│   │   │   │   ├── common/
+│   │   │   │   ├── config/
+│   │   │   │   ├── exception/
+│   │   │   │   ├── lock/
+│   │   │   │   └── security/
+│   │   │   └── JobradarBackendApplication
+│   │   └── resources/
+│   └── test/
+├── gradle/
+├── build.gradle
+├── settings.gradle
 ├── gradlew
 └── gradlew.bat
-
 ```
 
 ```
 jobradar-frontend/
 ├── src/
 │   ├── pages/             # 페이지
-│   │   ├── JobListPage
-│   │   ├── JobDetailPage
-│   │   ├── DashboardPage
-│   │   ├── MyPage
-│   │   ├── EditProfilePage
-│   │   ├── LoginPage
-│   │   ├── SignupPage
-│   │   ├── VerifyPasswordPage
-│   │   └── NotFoundPage
+│   │   ├── DashboardPage.tsx
+│   │   ├── EditProfilePage.tsx
+│   │   ├── JobDetailPage.tsx
+│   │   ├── JobListPage.tsx
+│   │   ├── LoginPage.tsx
+│   │   ├── MyPage.tsx
+│   │   ├── NotFoundPage.tsx
+│   │   ├── SignupPage.tsx
+│   │   └── VerifyPasswordPage.tsx
 │   ├── components/        # 재사용 컴포넌트
 │   │   ├── common/        # PrivateRoute, PolicyModal
 │   │   ├── job/           # JobCard, SearchFilter, Pagination
 │   │   └── layout/        # Navbar, Sidebar, Footer
 │   ├── api/               # API 함수
-│   │   ├── axios
-│   │   ├── authApi
-│   │   ├── jobApi
-│   │   ├── scrapApi
-│   │   ├── statsApi
-│   │   └── userApi
+│   │   ├── authApi.ts
+│   │   ├── axios.ts
+│   │   ├── jobApi.ts
+│   │   ├── scrapApi.ts
+│   │   ├── statsApi.ts
+│   │   └── userApi.ts
 │   ├── hooks/             # 커스텀 훅
 │   │   ├── useAuth
 │   │   ├── useScrap
@@ -179,8 +180,7 @@ jobradar-frontend/
 │   │   └── authStore
 │   ├── router/            # 라우터 설정
 │   ├── mocks/             # 목 데이터
-│   ├── utils/             # 유틸 함수
-│   └── assets/            # 정적 에셋
+│   └── utils/             # 유틸 함수
 └── public/                # favicon, manifest 등 공개 리소스
 ```
 
