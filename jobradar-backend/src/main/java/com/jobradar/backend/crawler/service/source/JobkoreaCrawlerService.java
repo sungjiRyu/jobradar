@@ -1,10 +1,9 @@
-package com.jobradar.backend.crawler;
+package com.jobradar.backend.crawler.service.source;
 
+import com.jobradar.backend.crawler.dto.CrawledJobDto;
+import com.jobradar.backend.crawler.service.CrawledJobSaveService;
+import com.jobradar.backend.crawler.service.CrawlerService;
 import com.jobradar.backend.job.dto.DescriptionResponse;
-import com.jobradar.backend.job.entity.Job;
-import com.jobradar.backend.job.entity.TechStack;
-import com.jobradar.backend.job.repository.JobRepository;
-import com.jobradar.backend.job.repository.TechStackRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -15,8 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
@@ -31,7 +28,7 @@ import java.util.regex.Pattern;
  *    - duty 파라미터로 직무 지정 (잡코리아 직종 코드)
  *    - 브라우저 JavaScript가 사용하는 POST 방식이므로 GET 방식 불가
  * 3. CSS 선택자로 공고 정보 추출 (제목, 회사명, 지역, 경력, 마감일, 게시일, URL)
- * 4. DB 중복 체크 → 이미 있는 공고면 스킵
+ * 4. 표준 DTO로 변환 후 공통 저장 서비스에 위임
  * 5. 한 페이지가 모두 중복이면 조기 종료
  *
  * [잡코리아 HTML 구조]
@@ -53,8 +50,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class JobkoreaCrawlerService implements CrawlerService {
 
-    private final JobRepository jobRepository;
-    private final TechStackRepository techStackRepository;
+    private final CrawledJobSaveService crawledJobSaveService;
 
     static final String BASE_URL = "https://www.jobkorea.co.kr";
 
@@ -79,12 +75,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
             Map.entry("모바일", "1000232"),
             Map.entry("데이터", "1000236,1000237,1000418"),
             Map.entry("AI/ML", "1000242,1000417")
-    );
-
-    // 공고 제목에서 파싱할 기술스택 키워드 목록
-    static final List<String> TECH_KEYWORDS = List.of(
-            "Java", "Spring", "Python", "React", "Vue", "Node.js",
-            "Docker", "AWS", "MySQL", "Redis", "Kotlin", "TypeScript", "Kubernetes"
     );
 
     @Override
@@ -116,7 +106,7 @@ public class JobkoreaCrawlerService implements CrawlerService {
      *
      * [종료 조건]
      * - crawlPage()가 -1 반환 → 공고 없음 = 마지막 페이지 도달
-     * - crawlPage()가 0 반환 → 해당 페이지 공고가 모두 DB에 이미 존재 → 조기 종료
+     * - crawlPage()가 0 반환 → 해당 페이지 공고가 모두 중복으로 스킵됨 → 조기 종료
      * - MAX_PAGES 초과 → 무한 루프 방지
      *
      * @param jobType  직무명 (예: "백엔드")
@@ -229,11 +219,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
         boolean isExternal = !href.startsWith("/") || href.endsWith("/Ext");
         String sourceUrl = href.startsWith("/") ? BASE_URL + href : href;
 
-        // 중복 체크 먼저 — 이미 있으면 스킵
-        if (jobRepository.existsBySourceUrl(sourceUrl)) {
-            return false;
-        }
-
         Element corpEl = item.selectFirst("td.tplCo a.link");
         String company = (corpEl != null) ? corpEl.text().trim() : "미기재";
 
@@ -252,49 +237,20 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // 게시일 파싱: "3시간 전 등록", "1일 전 등록" 등 상대적 표현
         LocalDate listedAt = parseListedAt(item);
 
-        return saveJob(title, company, location, experience, deadlineText, sourceUrl,
-                jobType, listedAt, employmentType, isExternal);
-    }
-
-    /**
-     * 공고 저장 (중복 체크 후 DB INSERT)
-     *
-     * @return true: 저장됨 / false: 중복으로 스킵
-     */
-    boolean saveJob(String title, String company, String location,
-                    String experience, String deadlineText, String sourceUrl,
-                    String jobType, LocalDate listedAt, String employmentType,
-                    boolean isExternal) {
-        // 중복 체크는 parseAndSave에서 이미 수행했으나, 단위 테스트가 saveJob을 직접 호출하므로 안전망
-        if (jobRepository.existsBySourceUrl(sourceUrl)) {
-            return false;
-        }
-
-        LocalDate deadline = parseDeadline(deadlineText);
-        Job.DeadlineType deadlineType = resolveDeadlineType(deadlineText);
-        List<TechStack> techStacks = resolveTechStacks(title);
-
-        // 외부 공고(알바몬/고용24)는 EXTERNAL 상태로 저장, 일반 공고는 null (lazy fetch 대상)
-        Job.DescriptionStatus descriptionStatus = isExternal ? Job.DescriptionStatus.EXTERNAL : null;
-
-        Job job = Job.builder()
-                .title(title)
-                .company(company)
-                .location(location.isBlank() ? "미기재" : location)
-                .experienceLevel(experience)
-                .employmentType(employmentType)
-                .deadline(deadline)
-                .deadlineType(deadlineType)
-                .sourceUrl(sourceUrl)
-                .sourceSite(getSiteName())
-                .jobType(jobType)
-                .listedAt(listedAt)
-                .descriptionStatus(descriptionStatus)
-                .build();
-
-        job.getTechStacks().addAll(techStacks);
-        jobRepository.save(job);
-        return true;
+        CrawledJobDto dto = new CrawledJobDto(
+                title,
+                company,
+                location,
+                experience,
+                employmentType,
+                deadlineText,
+                sourceUrl,
+                getSiteName(),
+                jobType,
+                listedAt,
+                isExternal
+        );
+        return crawledJobSaveService.save(dto);
     }
 
     /**
@@ -326,54 +282,6 @@ public class JobkoreaCrawlerService implements CrawlerService {
         }
 
         return null;
-    }
-
-    /**
-     * 마감일 텍스트 → LocalDate 변환
-     * 잡코리아 형식: "~05/10(일)", "채용시", ""
-     */
-    LocalDate parseDeadline(String text) {
-        if (text == null || text.isBlank() || text.contains("채용시") || text.contains("상시")) {
-            return null;
-        }
-        if (text.contains("내일")) {
-            return LocalDate.now().plusDays(1);
-        }
-        if (text.contains("오늘")) {
-            return LocalDate.now();
-        }
-
-        // (\d{1,2}): 한 자리(~5/3) 및 두 자리(~05/03) 모두 매칭
-        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
-        if (matcher.find()) {
-            int month = Integer.parseInt(matcher.group(1));
-            int day   = Integer.parseInt(matcher.group(2));
-            LocalDate parsed = LocalDate.of(LocalDate.now().getYear(), month, day);
-            if (parsed.isBefore(LocalDate.now())) {
-                parsed = parsed.plusYears(1);
-            }
-            return parsed;
-        }
-
-        return null;
-    }
-
-    /**
-     * 마감일 텍스트 → DeadlineType 변환
-     * parseDeadline()과 동일한 기준으로 판단
-     */
-    Job.DeadlineType resolveDeadlineType(String text) {
-        if (text == null || text.isBlank() || text.contains("내일") || text.contains("오늘")) {
-            return Job.DeadlineType.UNKNOWN;
-        }
-        if (text.contains("채용시") || text.contains("상시")) {
-            return Job.DeadlineType.ALWAYS;
-        }
-        Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
-        if (matcher.find()) {
-            return Job.DeadlineType.FIXED;
-        }
-        return Job.DeadlineType.UNKNOWN;
     }
 
     /**
@@ -420,22 +328,4 @@ public class JobkoreaCrawlerService implements CrawlerService {
         }
     }
 
-    /**
-     * 공고 제목에서 기술스택 키워드 추출 후 DB 조회 또는 신규 생성
-     */
-    List<TechStack> resolveTechStacks(String title) {
-        List<TechStack> result = new ArrayList<>();
-
-        for (String keyword : TECH_KEYWORDS) {
-            if (title.toLowerCase().contains(keyword.toLowerCase())) {
-                TechStack techStack = techStackRepository.findByName(keyword)
-                        .orElseGet(() -> techStackRepository.save(
-                                TechStack.builder().name(keyword).build()
-                        ));
-                result.add(techStack);
-            }
-        }
-
-        return result;
-    }
 }

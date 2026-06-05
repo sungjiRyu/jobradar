@@ -1,4 +1,4 @@
-package com.jobradar.backend.crawler;
+package com.jobradar.backend.crawler.service;
 
 /**
  * 크롤러 서비스 인터페이스

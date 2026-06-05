@@ -1,8 +1,8 @@
 package com.jobradar.backend.job.service;
 
-import com.jobradar.backend.crawler.JobkoreaCrawlerService;
-import com.jobradar.backend.crawler.SaraminCrawlerService;
-import com.jobradar.backend.global.config.AiSummaryService;
+import com.jobradar.backend.crawler.service.source.JobkoreaCrawlerService;
+import com.jobradar.backend.crawler.service.source.SaraminCrawlerService;
+import com.jobradar.backend.global.ai.AiSummaryService;
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
 import com.jobradar.backend.global.lock.LockAcquisitionException;

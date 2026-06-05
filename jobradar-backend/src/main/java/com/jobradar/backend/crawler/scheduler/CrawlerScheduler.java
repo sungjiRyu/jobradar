@@ -1,6 +1,8 @@
-package com.jobradar.backend.crawler;
+package com.jobradar.backend.crawler.scheduler;
 
 import com.jobradar.backend.global.config.CacheConfig;
+import com.jobradar.backend.crawler.service.AlwaysOpenCheckService;
+import com.jobradar.backend.crawler.service.CrawlerService;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +46,7 @@ public class CrawlerScheduler {
 
     /**
      * 상시채용 공고 유효성 검사 — 매주 월요일 새벽 3시 실행
-     * 일별 크롤링(runCrawling)과 시각이 같지만 요일 조건으로 분리됨
+     * 일별 크롤링(runCrawling)과 같은 시각에 예약되어 기본 스케줄러에서는 순차 실행됨
      * cron: 초 분 시 일 월 요일 (1=일요일, 2=월요일, ... 7=토요일)
      */
     @Scheduled(cron = "0 0 3 * * 2", zone = "Asia/Seoul")

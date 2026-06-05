@@ -1,4 +1,4 @@
-package com.jobradar.backend.crawler;
+package com.jobradar.backend.crawler.service;
 
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;

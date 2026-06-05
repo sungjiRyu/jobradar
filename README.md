@@ -129,7 +129,11 @@ jobradar-backend/
 │   │   │   │   ├── repository/
 │   │   │   │   └── service/
 │   │   │   ├── crawler/           # 채용공고 크롤링
-│   │   │   │   └── dto/
+│   │   │   │   ├── controller/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── scheduler/
+│   │   │   │   └── service/
+│   │   │   │       └── source/
 │   │   │   ├── global/            # 전역 공통 기능
 │   │   │   │   ├── ai/
 │   │   │   │   ├── cache/
