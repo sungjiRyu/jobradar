@@ -96,6 +96,15 @@ public class JobSpecification {
     }
 
     /**
+     * 원본 사이트 IN 절 (완전 일치)
+     * "사람인" → sourceSite = '사람인'
+     * 복수 선택 시 OR 조건: sourceSite IN ('사람인', '잡코리아')
+     */
+    public static Specification<Job> hasSourceSite(List<String> sourceSites) {
+        return (root, query, cb) -> root.get("sourceSite").in(sourceSites);
+    }
+
+    /**
      * 오늘 등록된 공고 (createdAt 날짜 기준)
      * CAST(created_at AS DATE) = TODAY
      */

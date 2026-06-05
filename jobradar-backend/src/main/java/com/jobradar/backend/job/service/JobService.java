@@ -53,6 +53,7 @@ public class JobService {
                                     List<String> experiences,
                                     List<String> techStacks,
                                     List<String> jobTypes,
+                                    List<String> sourceSites,
                                     boolean todayOnly,
                                     boolean urgentOnly,
                                     Pageable pageable) {
@@ -74,6 +75,9 @@ public class JobService {
         }
         if (!CollectionUtils.isEmpty(jobTypes)) {
             spec = spec.and(JobSpecification.hasJobType(jobTypes));
+        }
+        if (!CollectionUtils.isEmpty(sourceSites)) {
+            spec = spec.and(JobSpecification.hasSourceSite(sourceSites));
         }
         if (todayOnly) {
             spec = spec.and(JobSpecification.isCreatedToday());
