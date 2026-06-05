@@ -44,6 +44,7 @@ public class JobController {
             @RequestParam(name = "experienceLevel", required = false) List<String> experiences,
             @RequestParam(name = "techStack", required = false) List<String> techStacks,
             @RequestParam(name = "jobType", required = false) List<String> jobTypes,
+            @RequestParam(name = "sourceSite", required = false) List<String> sourceSites,
             @RequestParam(name = "todayOnly", required = false, defaultValue = "false") boolean todayOnly,
             @RequestParam(name = "urgentOnly", required = false, defaultValue = "false") boolean urgentOnly,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -56,7 +57,7 @@ public class JobController {
             pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
         }
 
-        return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, jobTypes, todayOnly, urgentOnly, pageable));
+        return ApiResponse.ok(jobService.search(keyword, locations, experiences, techStacks, jobTypes, sourceSites, todayOnly, urgentOnly, pageable));
     }
 
     /** GET /api/jobs/{id} — 공고 상세 조회 (DB 조회만, 즉시 응답) */

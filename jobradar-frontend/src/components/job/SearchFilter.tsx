@@ -6,7 +6,8 @@ import { useState, useEffect, useRef } from "react";
 
 export interface FilterState {
   keyword: string;
-  job: string | null;       // 직무: 단일 선택
+  jobs: string[];           // 직무: 복수 선택
+  sourceSites: string[];    // 원본사이트: 복수 선택
   locations: string[];      // 지역: 복수 선택
   experiences: string[];    // 경력: 복수 선택
   techStacks: string[];     // 기술스택: 복수 선택
@@ -14,11 +15,12 @@ export interface FilterState {
 }
 
 export interface SearchFilterProps {
+  value: FilterState;
   onFilterChange: (filter: FilterState) => void;
 }
 
 // 드롭다운 필터 4종 (label === value, 루프로 렌더링)
-type FilterKey = "job" | "locations" | "experiences" | "techStacks";
+type FilterKey = "jobs" | "sourceSites" | "locations" | "experiences" | "techStacks";
 
 // ─────────────────────────────────────────────
 // 필터 옵션 데이터
@@ -28,23 +30,27 @@ type FilterKey = "job" | "locations" | "experiences" | "techStacks";
 const FILTER_CONFIG: Record<FilterKey, {
   label: string;
   options: string[];
-  multi: boolean;       // true: 복수 선택 / false: 단일 선택
   activeBtn: string;    // 선택값 있을 때 버튼 스타일
   badge: string;        // 복수 선택 개수 뱃지 배경색
   checkBox: string;     // 선택된 항목 체크박스 스타일
 }> = {
-  job: {
+  jobs: {
     label: "직무",
     options: ["백엔드", "프론트엔드", "풀스택", "DevOps", "데이터", "AI/ML", "모바일"],
-    multi: false,
     activeBtn: "bg-[#E6F1FB] text-[#0C447C] border-[#378ADD]",
     badge: "bg-[#378ADD]",
     checkBox: "bg-[#E6F1FB] border-[#85B7EB] text-[#378ADD]",
   },
+  sourceSites: {
+    label: "원본사이트",
+    options: ["사람인", "잡코리아"],
+    activeBtn: "bg-[#E4F6F4] text-[#145C59] border-[#28A7A0]",
+    badge: "bg-[#28A7A0]",
+    checkBox: "bg-[#E4F6F4] border-[#28A7A0] text-[#28A7A0]",
+  },
   locations: {
     label: "지역",
     options: ["서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "세종", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"],
-    multi: true,
     activeBtn: "bg-[#EAF3DE] text-[#27500A] border-[#1D9E75]",
     badge: "bg-[#1D9E75]",
     checkBox: "bg-[#EAF3DE] border-[#97C459] text-[#27500A]",
@@ -53,7 +59,6 @@ const FILTER_CONFIG: Record<FilterKey, {
     label: "경력",
     // DB 저장 형태에 포함되는 문자열로 LIKE 검색
     options: ["신입", "경력무관", "경력1년", "경력3년", "경력5년", "경력10년"],
-    multi: true,
     activeBtn: "bg-[#EEEDFE] text-[#3C3489] border-[#7F77DD]",
     badge: "bg-[#7F77DD]",
     checkBox: "bg-[#EEEDFE] border-[#AFA9EC] text-[#7F77DD]",
@@ -61,14 +66,13 @@ const FILTER_CONFIG: Record<FilterKey, {
   techStacks: {
     label: "기술스택",
     options: ["Java", "Spring", "Python", "React", "Vue", "Node.js", "AWS", "Docker", "Kotlin", "TypeScript", "MySQL", "Redis", "Kubernetes", "Jenkins"],
-    multi: true,
     activeBtn: "bg-[#FAEEDA] text-[#633806] border-[#EF9F27]",
     badge: "bg-[#EF9F27]",
     checkBox: "bg-[#FAEEDA] border-[#EF9F27] text-[#EF9F27]",
   },
 };
 
-const MAIN_FILTER_KEYS: FilterKey[] = ["job", "locations", "experiences", "techStacks"];
+const MAIN_FILTER_KEYS: FilterKey[] = ["jobs", "locations", "experiences", "techStacks", "sourceSites"];
 
 // 정렬 옵션 (label: 화면 표시, value: API 전달값)
 // label ≠ value 이므로 일반 필터와 별도로 관리
@@ -80,7 +84,8 @@ const SORT_OPTIONS = [
 
 const INITIAL_FILTER: FilterState = {
   keyword: "",
-  job: null,
+  jobs: [],
+  sourceSites: [],
   locations: [],
   experiences: [],
   techStacks: [],
@@ -91,16 +96,17 @@ const INITIAL_FILTER: FilterState = {
 // 메인 컴포넌트
 // ─────────────────────────────────────────────
 
-const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
-  const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
-  const [keywordInput, setKeywordInput] = useState("");
+const SearchFilter = ({ value, onFilterChange }: SearchFilterProps) => {
+  const [filter, setFilter] = useState<FilterState>(value);
+  const [keywordInput, setKeywordInput] = useState(value.keyword);
 
   // 현재 열린 드롭다운 패널 (하나만 열림)
   const [openPanel, setOpenPanel] = useState<FilterKey | null>(null);
 
   // 각 패널 내부 검색창 입력값 (정렬은 옵션이 3개뿐이라 검색 불필요하지만 타입 통일)
   const [panelSearches, setPanelSearches] = useState<Record<FilterKey, string>>({
-    job: "",
+    jobs: "",
+    sourceSites: "",
     locations: "",
     experiences: "",
     techStacks: "",
@@ -122,10 +128,15 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openPanel]);
 
-  // 필터 변경 시마다 부모에게 알림
   useEffect(() => {
-    onFilterChange(filter);
-  }, [filter]);
+    setFilter(value);
+    setKeywordInput(value.keyword);
+  }, [value]);
+
+  const applyFilter = (next: FilterState) => {
+    setFilter(next);
+    onFilterChange(next);
+  };
 
   // ── 핸들러 ───────────────────────────────────
 
@@ -135,62 +146,62 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
     setPanelSearches(prev => ({ ...prev, [key]: "" }));
   };
 
-  // 일반 필터 항목 선택 (직무: 단일, 나머지: 복수 토글)
+  // 일반 필터 항목 선택 (모두 복수 토글)
   const handleSelect = (key: FilterKey, value: string) => {
-    setFilter(prev => {
-      if (key === "job") {
-        return { ...prev, job: prev.job === value ? null : value };
-      }
-      const arr = prev[key] as string[];
-      return {
-        ...prev,
-        [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value],
-      };
+    const arr = filter[key] as string[];
+    applyFilter({
+      ...filter,
+      [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value],
     });
   };
 
   // 정렬 선택 (단일 선택 후 패널 닫기)
   const handleSortSelect = (value: string) => {
-    setFilter(prev => ({ ...prev, sort: value }));
+    applyFilter({ ...filter, sort: value });
     setOpenPanel(null);
   };
 
   // 특정 필터만 초기화
   const handleReset = (key: FilterKey) => {
-    setFilter(prev => ({ ...prev, [key]: key === "job" ? null : [] }));
+    applyFilter({ ...filter, [key]: [] });
+  };
+
+  // 특정 필터의 모든 항목 선택/해제
+  const handleToggleAll = (key: FilterKey) => {
+    const options = FILTER_CONFIG[key].options;
+    const selected = getSelected(key);
+    const allSelected = options.every(opt => selected.includes(opt));
+    applyFilter({ ...filter, [key]: allSelected ? [] : [...options] });
   };
 
   // 모든 필터 초기화
   const handleResetAll = () => {
     setFilter(INITIAL_FILTER);
     setKeywordInput("");
+    onFilterChange(INITIAL_FILTER);
   };
 
   // 활성 태그 ✕ 클릭 → 해당 항목만 해제
   const handleRemoveTag = (key: FilterKey, value: string) => {
-    setFilter(prev => {
-      if (key === "job") return { ...prev, job: null };
-      const arr = prev[key] as string[];
-      return { ...prev, [key]: arr.filter(v => v !== value) };
-    });
+    const arr = filter[key] as string[];
+    applyFilter({ ...filter, [key]: arr.filter(v => v !== value) });
   };
 
   // 검색어 확정 (버튼 클릭 또는 Enter)
   const handleSearch = () => {
-    setFilter(prev => ({ ...prev, keyword: keywordInput }));
+    applyFilter({ ...filter, keyword: keywordInput });
   };
 
   // 검색어 초기화 (✕ 버튼)
   const handleClearKeyword = () => {
     setKeywordInput("");
-    setFilter(prev => ({ ...prev, keyword: "" }));
+    applyFilter({ ...filter, keyword: "" });
   };
 
   // ── 헬퍼 ─────────────────────────────────────
 
   // 특정 필터의 선택된 값 배열 반환
   const getSelected = (key: FilterKey): string[] => {
-    if (key === "job") return filter.job ? [filter.job] : [];
     return filter[key] as string[];
   };
 
@@ -243,12 +254,13 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
       {/* ── 드롭다운 버튼 행 ── */}
       <div className="flex items-center gap-2 flex-wrap">
 
-        {/* 일반 필터 4종 (직무/지역/경력/기술스택) — FILTER_CONFIG 기반 루프 */}
+        {/* 일반 필터 5종 (직무/원본사이트/지역/경력/기술스택) — FILTER_CONFIG 기반 루프 */}
         {MAIN_FILTER_KEYS.map(key => {
           const config = FILTER_CONFIG[key];
           const selected = getSelected(key);
           const isActive = selected.length > 0;
           const isOpen = openPanel === key;
+          const isAllSelected = config.options.every(opt => selected.includes(opt));
 
           return (
             <div key={key} className="relative" ref={el => { dropdownRefs.current.set(key, el); }}>
@@ -263,7 +275,7 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
               >
                 <span>{config.label}</span>
                 {/* 복수 선택 시 개수 뱃지 */}
-                {isActive && config.multi && selected.length > 1 && (
+                {isActive && selected.length > 1 && (
                   <span className={`flex items-center justify-center w-4 h-4 rounded-full text-white text-[10px] font-semibold ${config.badge}`}>
                     {selected.length}
                   </span>
@@ -287,6 +299,19 @@ const SearchFilter = ({ onFilterChange }: SearchFilterProps) => {
 
                   {/* 항목 목록 */}
                   <div className="max-h-[200px] overflow-y-auto py-1">
+                    <button
+                      onClick={() => handleToggleAll(key)}
+                      className="w-full flex items-center gap-2 px-3 py-[7px] text-[12px] text-[#555] hover:bg-[#F8F8F8] text-left border-b border-[#F0F0F0]"
+                    >
+                      <span className={`flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors ${isAllSelected ? config.checkBox : "border-[#DDDDDD] bg-white"}`}>
+                        {isAllSelected && (
+                          <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                            <path d="M1 3.5L3.5 6L8 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                      전체 선택
+                    </button>
                     {config.options
                       .filter(opt => opt.toLowerCase().includes(panelSearches[key].toLowerCase()))
                       .map(opt => {

@@ -6,11 +6,15 @@
 import api from "./axios";
 
 // 공고 목록 조회용 쿼리 파라미터 타입
-interface JobSearchParams {
+export interface JobSearchParams {
   keyword?: string;
-  location?: string;
-  experienceLevel?: string;
-  techStack?: string;
+  jobType?: string | string[];
+  sourceSite?: string | string[];
+  location?: string | string[];
+  experienceLevel?: string | string[];
+  techStack?: string | string[];
+  todayOnly?: boolean;
+  urgentOnly?: boolean;
   page?: number;
   size?: number;
   sort?: string;

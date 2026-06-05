@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getJobs } from "../api/jobApi";
+import type { JobSearchParams } from "../api/jobApi";
 import SearchFilter from "../components/job/SearchFilter";
 import type { FilterState } from "../components/job/SearchFilter";
 import JobCard from "../components/job/JobCard";
@@ -12,13 +13,71 @@ import type { TodayStats } from "../api/statsApi";
 import { getScraps } from "../api/scrapApi";
 import { usePageTitle } from "../hooks/usePageTitle";
 
+type ActiveCard = "all" | "today" | "urgent" | "junior" | null;
+
 const INITIAL_FILTER: FilterState = {
   keyword: "",
-  job: null,
+  jobs: [],
+  sourceSites: [],
   locations: [],
   experiences: [],
   techStacks: [],
   sort: "",
+};
+
+const isActiveCard = (value: string | null): value is Exclude<ActiveCard, null> =>
+  value === "all" || value === "today" || value === "urgent" || value === "junior";
+
+const filterFromSearchParams = (params: URLSearchParams): FilterState => ({
+  keyword: params.get("keyword") ?? "",
+  jobs: params.getAll("jobType"),
+  sourceSites: params.getAll("sourceSite"),
+  locations: params.getAll("location"),
+  experiences: params.getAll("experienceLevel"),
+  techStacks: params.getAll("techStack"),
+  sort: params.get("sort") ?? "",
+});
+
+const cardFromSearchParams = (params: URLSearchParams): ActiveCard => {
+  const card = params.get("card");
+  return isActiveCard(card) ? card : null;
+};
+
+const SEARCH_PARAM_KEYS = [
+  "page",
+  "keyword",
+  "jobType",
+  "sourceSite",
+  "location",
+  "experienceLevel",
+  "techStack",
+  "sort",
+  "card",
+];
+
+const searchParamsFromState = (
+  baseParams: URLSearchParams,
+  filter: FilterState,
+  activeCard: ActiveCard,
+  page = 1,
+) => {
+  const next = new URLSearchParams(baseParams);
+  SEARCH_PARAM_KEYS.forEach((key) => next.delete(key));
+
+  next.set("page", String(page));
+
+  if (filter.keyword) next.set("keyword", filter.keyword);
+  filter.jobs.forEach((job) => next.append("jobType", job));
+  filter.sourceSites.forEach((sourceSite) => next.append("sourceSite", sourceSite));
+  filter.locations.forEach((location) => next.append("location", location));
+  filter.experiences.forEach((experience) =>
+    next.append("experienceLevel", experience),
+  );
+  filter.techStacks.forEach((techStack) => next.append("techStack", techStack));
+  if (filter.sort) next.set("sort", filter.sort);
+  if (activeCard) next.set("card", activeCard);
+
+  return next;
 };
 
 const JobListPage = () => {
@@ -35,12 +94,16 @@ const JobListPage = () => {
   const [error, setError] = useState("");
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [currentFilter, setCurrentFilter] =
-    useState<FilterState>(INITIAL_FILTER);
+  const searchParamString = searchParams.toString();
+  const currentFilter = useMemo(
+    () => filterFromSearchParams(new URLSearchParams(searchParamString)),
+    [searchParamString],
+  );
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
-  const [activeCard, setActiveCard] = useState<
-    "all" | "today" | "urgent" | "junior" | null
-  >(null);
+  const activeCard = useMemo(
+    () => cardFromSearchParams(new URLSearchParams(searchParamString)),
+    [searchParamString],
+  );
   // jobPostId → scrapId 맵: 스크랩된 공고를 O(1)로 조회하기 위한 캐시
   const [scrapsMap, setScrapsMap] = useState<Record<number, number>>({});
 
@@ -55,21 +118,21 @@ const JobListPage = () => {
   const handleFilterChange = (newFilter: FilterState) => {
     const onlySortChanged =
       newFilter.keyword === currentFilter.keyword &&
-      newFilter.job === currentFilter.job &&
+      newFilter.jobs.join() === currentFilter.jobs.join() &&
+      newFilter.sourceSites.join() === currentFilter.sourceSites.join() &&
       newFilter.locations.join() === currentFilter.locations.join() &&
       newFilter.experiences.join() === currentFilter.experiences.join() &&
       newFilter.techStacks.join() === currentFilter.techStacks.join();
 
-    setCurrentFilter(newFilter);
-    if (!onlySortChanged) setActiveCard(null);
-    setSearchParams(new URLSearchParams({ page: "1" }));
+    const nextCard = onlySortChanged ? activeCard : null;
+    setSearchParams(searchParamsFromState(searchParams, newFilter, nextCard, 1));
   };
 
   // 현황 카드 클릭 — 같은 카드 재클릭 시 해제, "all" 클릭 시 필터 초기화
-  const handleCardClick = (card: "all" | "today" | "urgent" | "junior") => {
-    if (card === "all") setCurrentFilter({ ...INITIAL_FILTER });
-    setActiveCard((prev) => (prev === card ? null : card));
-    setSearchParams(new URLSearchParams({ page: "1" }));
+  const handleCardClick = (card: Exclude<ActiveCard, null>) => {
+    const nextCard = activeCard === card ? null : card;
+    const nextFilter = card === "all" ? INITIAL_FILTER : currentFilter;
+    setSearchParams(searchParamsFromState(searchParams, nextFilter, nextCard, 1));
   };
 
   // 오늘의 현황 통계 (최초 1회)
@@ -103,13 +166,15 @@ const JobListPage = () => {
       setError("");
 
       try {
-        const params: Record<string, string | number | string[] | boolean> = {
+        const params: JobSearchParams = {
           page,
           size: 10,
         };
 
         if (currentFilter.keyword) params.keyword = currentFilter.keyword;
-        if (currentFilter.job) params.jobType = currentFilter.job;
+        if (currentFilter.jobs.length > 0) params.jobType = currentFilter.jobs;
+        if (currentFilter.sourceSites.length > 0)
+          params.sourceSite = currentFilter.sourceSites;
         if (currentFilter.locations.length > 0)
           params.location = currentFilter.locations;
         if (currentFilter.experiences.length > 0)
@@ -146,7 +211,10 @@ const JobListPage = () => {
     <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-6">
       {/* 검색 + 필터 */}
       <div className="mb-4">
-        <SearchFilter onFilterChange={handleFilterChange} />
+        <SearchFilter
+          value={currentFilter}
+          onFilterChange={handleFilterChange}
+        />
       </div>
 
       {/* 오늘의 현황 카드 — 모바일: 2x2, lg+: 4x1 */}
