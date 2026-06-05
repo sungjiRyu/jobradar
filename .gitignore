@@ -3,9 +3,6 @@
 .env.local
 .env.production
 
-# Claude Code 가이드 (개인용)
-CLAUDE.md
-
 # 샘플 UI
 JobRadar_UI_sample.html
 
