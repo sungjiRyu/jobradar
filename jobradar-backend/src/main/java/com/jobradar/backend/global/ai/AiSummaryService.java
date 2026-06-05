@@ -1,4 +1,4 @@
-package com.jobradar.backend.global.config;
+package com.jobradar.backend.global.ai;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import jakarta.annotation.PostConstruct;

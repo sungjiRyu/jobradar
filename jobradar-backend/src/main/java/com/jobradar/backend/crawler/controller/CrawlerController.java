@@ -1,5 +1,6 @@
-package com.jobradar.backend.crawler;
+package com.jobradar.backend.crawler.controller;
 
+import com.jobradar.backend.crawler.scheduler.CrawlerScheduler;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
