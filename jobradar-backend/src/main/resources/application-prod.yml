@@ -20,11 +20,16 @@ spring:
         jdbc:
           time_zone: Asia/Seoul
 
-  # ===== Redis (EC2 내부 localhost) =====
+  # ===== Redis (환경변수로 주입) =====
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+
+# ===== CORS =====
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 # ===== JWT =====
 jwt:

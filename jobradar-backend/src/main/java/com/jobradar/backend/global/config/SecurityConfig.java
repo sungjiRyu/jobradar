@@ -2,6 +2,7 @@ package com.jobradar.backend.global.config;
 
 import com.jobradar.backend.global.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -36,13 +37,15 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
             // CSRF 비활성화
             .csrf(AbstractHttpConfigurer::disable)
 
             // CORS 설정 적용
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
             // 세션 미사용: JWT로 인증하므로 서버에 세션을 유지하지 않음
             .sessionManagement(session ->
@@ -76,11 +79,12 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /** CORS 설정: 프론트엔드(Vite 기본 포트 5173)에서 오는 요청 허용 */
+    /** CORS 설정: 환경별로 주입된 프론트엔드 Origin의 요청 허용 */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173", "https://jobradar.me"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
