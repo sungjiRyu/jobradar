@@ -23,8 +23,13 @@ spring:
   # ===== Redis =====
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+# ===== CORS =====
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 # ===== JWT =====
 jwt:
