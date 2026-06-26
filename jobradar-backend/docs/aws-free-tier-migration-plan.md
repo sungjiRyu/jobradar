@@ -4,9 +4,11 @@
 
 ## 0. 현재 진행 현황
 
-기준일: `2026-06-23`
+기준일: `2026-06-27`
 
-현재 운영 서비스는 기존 AWS 계정의 EC2에서 JAR와 systemd 방식으로 정상 운영 중이다. 신규 AWS 계정에는 네트워크와 Docker 이미지 공급 경로까지 준비됐으며, 아직 RDS, Valkey, EC2, ALB는 생성하지 않았다.
+운영 트래픽은 신규 AWS 계정의 ALB + EC2 Docker 백엔드로 전환됐다. 프론트엔드는 기존 AWS 계정의 S3 + CloudFront를 계속 사용하며, API 호출만 `https://api.jobradar.me`를 통해 신규 계정 ALB로 전달한다.
+
+현재 상태는 “신규 인프라 이관과 Docker 자동 배포 완료” 단계다. 엄밀한 의미의 ALB Target Group 기반 Blue/Green 무중단 배포는 아직 완료되지 않았고, 다음 작업에서 “배포 중에만 임시 EC2를 추가 생성하는 EC2 단위 Blue/Green” 방식으로 구현한다.
 
 ### 0.1 확정 정보
 
@@ -15,15 +17,20 @@ GitHub Repository: sungjiRyu/jobradar
 신규 AWS Account: 458697684210
 Region: ap-northeast-2
 ECR Repository: jobradar-backend
-현재 ECR Image Tag: 5b784b7951bc3dfadd8d679cf503252384863096
-현재 운영 방식: 기존 EC2 JAR + systemd
-목표 운영 방식: ECR + Docker + 임시 Green EC2 + ALB Blue/Green
+현재 Backend Image Tag: c3a1ef6445cf112cd9feea11fa93febf93922868
+Backend API Domain: https://api.jobradar.me
+Frontend Domain: https://jobradar.me
+현재 운영 방식: ALB + 단일 EC2 Docker 컨테이너
+현재 배포 방식: GitHub Actions + ECR + SSM Run Command 자동 배포
+다음 목표 운영 방식: ECR + Docker + 배포 중 임시 EC2 + ALB Blue/Green
 ```
 
 비용 원칙:
 
 - 실무와 유사한 VPC, Private Data Subnet, ALB, Blue/Green 구조를 유지한다.
-- RDS는 Single-AZ, Valkey는 단일 노드, Green EC2는 배포 중에만 사용한다.
+- RDS는 Single-AZ를 사용한다.
+- Valkey는 ElastiCache Serverless를 사용한다.
+- 평상시 Backend EC2는 1대만 유지하고, Blue/Green 배포 중에만 임시 EC2를 추가 생성한다.
 - NAT Gateway와 유료 Interface VPC Endpoint는 사용하지 않는다.
 - 신규 계정의 `$200` 크레딧을 사용하며, 유료 리소스 생성 후에는 작업을 연속 진행해 유휴 비용을 줄인다.
 
@@ -48,6 +55,23 @@ ECR Repository: jobradar-backend
 - [x] GitHub Actions에서 `linux/amd64` 이미지 빌드와 ECR Push 성공
 - [x] 동일 Git SHA 이미지가 이미 있으면 Push를 생략하도록 멱등성 적용
 - [x] 기존 JAR 배포와 운영 서비스 정상 동작 확인
+- [x] 신규 RDS MySQL `database-1` 생성
+- [x] 기존 RDS `job_radar` 데이터를 `mysqldump`로 신규 RDS에 이관
+- [x] ElastiCache Serverless Valkey `jobradar-valkey` 생성
+- [x] SSM Parameter Store에 운영 환경변수와 Vertex 인증정보 등록
+- [x] Green EC2 `jobradar-green-ec2` 생성
+- [x] Green EC2에서 ECR image pull, Docker container 실행, RDS·Valkey·Vertex 연결 검증
+- [x] Valkey Serverless TLS 연결을 위해 `REDIS_SSL=true`와 `rediss://` 지원 추가
+- [x] ALB `jobradar-alb` 생성
+- [x] Target Group `jobradar-green-tg` health check `healthy` 확인
+- [x] ACM 인증서 `jobradar.me`, `*.jobradar.me` 발급
+- [x] 기존 계정 Route 53에 `api.jobradar.me` CNAME 추가
+- [x] `https://api.jobradar.me/actuator/health` HTTP/2 200 확인
+- [x] ALB HTTP 80 -> HTTPS 443 redirect 설정
+- [x] 프론트 API base URL을 `https://api.jobradar.me`로 전환
+- [x] 프론트 smoke test 완료
+- [x] Backend GitHub Actions를 기존 JAR 배포에서 Docker + SSM 자동 배포로 전환
+- [x] 자동 배포 성공 확인
 
 ECR 첫 Push 결과:
 
@@ -65,33 +89,70 @@ BuildKit Provenance:
 sha256:a5c832363b4be55fe0508857a94d3f83edc1fd37eceef88ee593f2b5eb686252
 ```
 
-### 0.3 다음 작업
+### 0.3 현재 운영 구조
 
-다음 작업은 신규 계정의 `RDS MySQL Single-AZ` 생성이다. 이 단계부터 시간당 비용과 무료 크레딧 소모가 시작된다.
+```text
+사용자
+  -> 기존 AWS 계정 Route 53
+  -> 기존 AWS 계정 CloudFront
+  -> 기존 AWS 계정 S3 frontend
+
+Frontend JavaScript
+  -> https://api.jobradar.me
+  -> 신규 AWS 계정 ALB
+  -> 신규 AWS 계정 EC2 Docker backend
+  -> 신규 AWS 계정 RDS MySQL
+  -> 신규 AWS 계정 ElastiCache Serverless Valkey
+
+GitHub Actions Backend
+  -> OIDC AssumeRole
+  -> Test/Build
+  -> ECR Push
+  -> SSM Run Command
+  -> EC2 Docker container 교체
+  -> /actuator/health 검증
+```
+
+### 0.4 다음 작업
+
+다음 작업은 ALB Target Group 기반 Blue/Green 무중단 배포 자동화다.
+
+채택한 방식:
+
+```text
+평상시:
+  운영 EC2 1대만 유지
+
+배포 시:
+  새 EC2 1대 임시 생성
+  새 EC2에 신규 Docker image 실행
+  Target Group health check 통과 확인
+  ALB listener를 새 Target Group으로 전환
+  기존 EC2는 관찰 후 종료
+```
 
 남은 순서:
 
-1. RDS MySQL Single-AZ 저비용 인스턴스 생성
-2. ElastiCache for Valkey `cache.t4g.micro` 단일 노드 생성
-3. SSM Parameter Store 운영 환경변수 등록
-4. 예약 작업 분산 락, 상태 기록, Blue 종료 보호 구현
-5. EC2 Instance Role과 Launch Template 구성
-6. ALB, Blue/Green Target Group, ACM 인증서 구성
-7. Green EC2에서 ECR Pull, 컨테이너 실행, RDS·Valkey 연결 검증
-8. GitHub Actions를 Green 생성과 ALB 전환까지 확장
-9. 기존 RDS 데이터 이관과 주요 기능 검증
-10. `api.jobradar.me`, 프론트 API URL, CORS와 DNS 전환
-11. CloudWatch, 비용 알림, 롤백 검증
-12. 기존 AWS 계정의 JAR 배포와 과금 리소스 정리
+1. 기존 EC2와 RDS는 하루 정도 유지하며 롤백 가능성 확보
+2. 예약 작업 분산 락과 작업 상태 관리 보강
+3. Launch Template 생성
+4. Blue/Green Target Group 2개 구성
+5. GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
+6. GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
+7. Standby Target Group health check 대기 구현
+8. ALB listener 전환 구현
+9. 기존 Blue EC2 종료 보류/종료 정책 구현
+10. 실패 시 이전 Target Group rollback 검증
+11. 기존 AWS 계정 EC2/RDS 비용 리소스 정리
 
 ## 1. 목표
 
-현재 운영 중인 JobRadar의 AWS 배포환경을 신규 AWS Free Tier 계정으로 이관한다. 단순 이전이 아니라 운영 안정성, 보안, 배포 재현성을 함께 개선한다.
+현재 운영 중인 JobRadar의 AWS 배포환경을 신규 AWS 계정으로 이관한다. 단순 이전이 아니라 운영 안정성, 보안, 배포 재현성을 함께 개선한다.
 
 이번 이관에서 포함할 주요 변경 사항은 다음과 같다.
 
-- EC2 + RDS + S3 + CloudFront 기존 구조 유지
-- Redis Docker 컨테이너를 ElastiCache for Valkey로 이전
+- 프론트엔드는 우선 기존 AWS 계정의 S3 + CloudFront를 유지
+- Redis Docker 컨테이너를 ElastiCache Serverless Valkey로 이전
 - 백엔드 Spring Boot를 Docker 컨테이너 기반 배포로 전환
 - ECR을 백엔드 Docker 이미지 저장소로 사용
 - ALB + EC2 Blue/Green 무중단 배포 도입
@@ -100,7 +161,7 @@ sha256:a5c832363b4be55fe0508857a94d3f83edc1fd37eceef88ee593f2b5eb686252
 
 ## 2. 현재 운영 구조
 
-저장소 기준으로 확인되는 현재 구조는 다음과 같다.
+이관 전 구조는 다음과 같았다.
 
 ```text
 사용자
@@ -114,7 +175,7 @@ sha256:a5c832363b4be55fe0508857a94d3f83edc1fd37eceef88ee593f2b5eb686252
   -> EC2 내부 Docker Redis
 ```
 
-현재 GitHub Actions 배포 방식:
+이관 전 GitHub Actions 배포 방식:
 
 ```text
 Backend:
@@ -130,7 +191,7 @@ GitHub Actions
   -> CloudFront invalidation
 ```
 
-현재 확인된 주요 설정:
+이관 전 주요 설정:
 
 - 백엔드 운영 DB: `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`
 - 백엔드 운영 Redis: `localhost:6379`
@@ -139,9 +200,36 @@ GitHub Actions
 - CORS 허용 origin: `http://localhost:5173`, `https://jobradar.me`
 - 로컬 Docker Compose: MySQL 8.0, Valkey 8
 
+### 2.1 현재 운영 구조
+
+2026-06-27 기준 현재 운영 구조는 다음과 같다.
+
+```text
+사용자
+  -> 기존 AWS 계정 Route 53
+  -> 기존 AWS 계정 CloudFront
+  -> 기존 AWS 계정 S3 정적 프론트엔드
+
+프론트엔드
+  -> https://api.jobradar.me
+  -> 신규 AWS 계정 ALB
+  -> 신규 AWS 계정 Backend EC2
+  -> Backend Docker Container
+  -> 신규 AWS 계정 RDS MySQL
+  -> 신규 AWS 계정 ElastiCache Serverless Valkey
+
+GitHub Actions Backend
+  -> OIDC AssumeRole
+  -> Test/Build
+  -> ECR Push
+  -> SSM Run Command
+  -> Backend EC2 Docker container 교체
+  -> /actuator/health 검증
+```
+
 ## 3. 목표 운영 구조
 
-신규 AWS 계정의 목표 구조는 다음과 같다.
+최종 목표 구조는 다음과 같다.
 
 ```text
 사용자
@@ -150,18 +238,22 @@ GitHub Actions
   -> S3 정적 프론트엔드
 
 프론트엔드
-  -> api.jobradar.me
+  -> https://api.jobradar.me
   -> ALB
-  -> Blue 또는 Green EC2
+  -> Active Target Group
+  -> Active EC2
   -> Backend Docker Container
   -> RDS MySQL
-  -> ElastiCache for Valkey
+  -> ElastiCache Serverless Valkey
 
 GitHub Actions
   -> OIDC AssumeRole
   -> ECR Push
+  -> 배포용 임시 EC2 생성
   -> SSM Run Command
+  -> Standby Target Group health check
   -> ALB Target Group 전환
+  -> 기존 EC2 종료
 ```
 
 권장 도메인 구조:
@@ -261,14 +353,35 @@ SSH 22번 포트는 열지 않는 것을 목표로 한다. 서버 접속과 배�
 - DB name: `job_radar`
 - Character set/collation: 기존 DB와 동일하게 확인
 
+실제 생성 정보:
+
+```text
+DB identifier: database-1
+Engine: MySQL Community
+Engine version: 8.4.8
+Instance class: db.t4g.micro
+AZ: ap-northeast-2a
+Endpoint: database-1.c52m4gagoqlb.ap-northeast-2.rds.amazonaws.com
+Port: 3306
+DB name: job_radar
+Public access: No
+Security Group: jobradar-rds-sg
+```
+
 이관 방식:
 
 ```text
 기존 RDS mysqldump
-  -> 로컬 또는 임시 EC2 저장
+  -> SSH tunnel을 통해 로컬 PC에서 dump 생성
   -> 신규 RDS restore
   -> 앱 부팅 전 스키마 검증
 ```
+
+이관 결과:
+
+- `job_radar_dump.sql` 크기: 약 36MB
+- 기존 RDS schema와 data를 신규 RDS에 import
+- `ddl-auto: validate` 통과 확인
 
 주의:
 
@@ -278,7 +391,7 @@ SSH 22번 포트는 열지 않는 것을 목표로 한다. 서버 접속과 배�
 
 ### 6.2 ElastiCache for Valkey
 
-현재 EC2 Docker Redis를 Redis 호환 프로토콜을 제공하는 ElastiCache for Valkey로 이전한다.
+현재 EC2 Docker Redis를 Redis 호환 프로토콜을 제공하는 ElastiCache Serverless Valkey로 이전했다.
 
 Redis 사용처:
 
@@ -287,17 +400,22 @@ Redis 사용처:
 - Spring Cache
 - Redisson 분산 락
 
-권장 설정:
+실제 설정:
 
 - Engine: Valkey
-- Node type: `cache.t4g.micro`
-- Shard: 1
-- Replica: 0
-- Multi-AZ: 비용상 초기 비활성화
+- Deployment option: Serverless
+- Engine version: 9
+- Encryption in transit: Always enabled
 - Subnet group: Private Subnet
 - Security Group: `sg-backend`에서만 6379 허용
-- Automatic backup: 초기 비활성화
-- AUTH token/TLS: 초기 구축 복잡도를 고려해 선택하되, 외부 노출 없이 Security Group으로 접근을 제한
+- Endpoint: `jobradar-valkey-zn7sbh.serverless.apn2.cache.amazonaws.com:6379`
+- Security Group: `jobradar-redis-sg`
+
+주의:
+
+- Serverless Valkey는 TLS 연결이 필요하다.
+- 앱에서는 `REDIS_SSL=true`를 사용해 Redisson 주소를 `rediss://`로 구성한다.
+- Spring Data Redis는 `spring.data.redis.ssl.enabled` 설정을 사용한다.
 
 애플리케이션 설정 변경 방향:
 
@@ -319,6 +437,8 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
 ```
 
 Blue/Green에서 ElastiCache가 중요한 이유:
@@ -369,10 +489,12 @@ DB_PASSWORD=
 JWT_SECRET=
 REDIS_HOST=
 REDIS_PORT=6379
+REDIS_SSL=true
 VERTEX_PROJECT_ID=
 VERTEX_LOCATION=
 VERTEX_MODEL=
 VERTEX_CREDENTIALS_PATH=
+VERTEX_CREDENTIALS_JSON=
 ```
 
 운영 Docker Compose 예시 방향:
@@ -444,21 +566,29 @@ GitHub Actions
 
 ```text
 현재:
-1. 기존 EC2 JAR 배포
+1. Gradle test/build
 2. OIDC AssumeRole
 3. 같은 Git SHA 이미지 존재 여부 확인
 4. 없으면 linux/amd64 Docker image build
-5. ECR login 및 Git SHA 이미지 push
+5. ECR login 및 Git SHA image push
 6. 있으면 build/push 생략
+7. SSM Run Command로 운영 EC2에 배포 명령 실행
+8. EC2에서 Parameter Store 기반 app.env 재생성
+9. Vertex credentials JSON 파일 복원
+10. 새 Docker image pull
+11. 기존 container 교체
+12. /actuator/health 확인
 
-최종 목표:
-7. Green EC2 생성
-8. SSM Run Command로 컨테이너 실행
-9. ALB health check 확인
-10. ALB target group 전환
-11. 관찰 및 예약 작업 상태 확인
-12. 기존 Blue EC2 종료
+다음 목표:
+13. 배포용 임시 EC2 생성
+14. Standby Target Group에 새 EC2 등록
+15. Target Group health check 확인
+16. ALB listener 전환
+17. 관찰 및 예약 작업 상태 확인
+18. 기존 Blue EC2 종료
 ```
+
+기존 JAR 기반 EC2 배포 job은 제거됐다. 기존 EC2를 중지해도 백엔드 GitHub Actions 배포가 실패하지 않는다.
 
 ### 9.3 Frontend Workflow 목표
 
@@ -476,6 +606,8 @@ GitHub Actions
 ```text
 VITE_API_BASE_URL=https://api.jobradar.me
 ```
+
+프론트는 기존 AWS 계정의 S3 + CloudFront에 계속 배포한다. GitHub Actions 프론트 배포는 `VITE_API_BASE_URL=https://api.jobradar.me`로 build 후 S3 sync와 CloudFront invalidation을 수행한다.
 
 ## 10. Blue/Green 무중단 배포 전략
 
@@ -511,7 +643,14 @@ ALB -> Blue Target Group -> Blue EC2
 
 ### 10.3 Green EC2 생성 방식
 
-Green EC2는 Launch Template으로 생성한다.
+Green EC2는 Launch Template으로 생성한다. 채택한 방식은 평상시 EC2 1대만 유지하고, 배포 중에만 새 EC2를 임시로 추가 생성하는 구조다.
+
+채택 이유:
+
+- 단일 EC2 container 교체 방식보다 무중단 성격이 강하다.
+- EC2 2대를 상시 유지하지 않아 비용을 줄일 수 있다.
+- 새 EC2에서 Docker image, SSM, Parameter Store, RDS, Valkey 연결을 검증한 뒤 ALB를 전환할 수 있다.
+- 실패 시 기존 운영 EC2와 기존 Target Group은 건드리지 않으므로 rollback이 단순하다.
 
 Launch Template에 포함할 항목:
 
@@ -532,6 +671,31 @@ User Data 또는 SSM Run Command가 수행할 작업:
 3. env file 준비
 4. backend container 실행
 5. health check 대기
+```
+
+GitHub Actions Blue/Green 배포 흐름:
+
+```text
+1. ECR image push
+2. 현재 ALB HTTPS listener가 바라보는 active Target Group 조회
+3. standby Target Group 결정
+4. Launch Template으로 새 EC2 생성
+5. 새 EC2 running + SSM ready 대기
+6. SSM Run Command로 새 EC2에 container 실행
+7. standby Target Group에 새 EC2 등록
+8. standby Target Group health check healthy 대기
+9. ALB listener를 standby Target Group으로 전환
+10. 짧은 관찰 시간 동안 health/API 확인
+11. 기존 active EC2 deregister
+12. 기존 active EC2 terminate 또는 stop
+```
+
+배포 중 비용:
+
+```text
+평상시: Backend EC2 1대
+배포 중: 기존 EC2 1대 + 신규 EC2 1대
+배포 완료 후: 신규 EC2 1대
 ```
 
 ### 10.4 구버전 EC2 처리
@@ -606,27 +770,38 @@ ALB가 Green으로 전환된 뒤에도 기존 Blue에서 시작한 예약 작업
 
 비용을 줄이기 위해 우선 SSM Parameter Store Standard를 사용한다.
 
-예시 parameter:
+현재 사용 중인 parameter:
 
 ```text
-/jobradar/prod/db/host
-/jobradar/prod/db/username
-/jobradar/prod/db/password
-/jobradar/prod/jwt/secret
-/jobradar/prod/redis/host
-/jobradar/prod/vertex/project-id
-/jobradar/prod/vertex/credentials-path
+/jobradar/prod/DB_HOST
+/jobradar/prod/DB_USERNAME
+/jobradar/prod/DB_PASSWORD
+/jobradar/prod/REDIS_HOST
+/jobradar/prod/REDIS_PORT
+/jobradar/prod/REDIS_SSL
+/jobradar/prod/CORS_ALLOWED_ORIGINS
+/jobradar/prod/JWT_SECRET
+/jobradar/prod/VERTEX_PROJECT_ID
+/jobradar/prod/VERTEX_LOCATION
+/jobradar/prod/VERTEX_MODEL
+/jobradar/prod/VERTEX_CREDENTIALS_PATH
+/jobradar/prod/VERTEX_CREDENTIALS_JSON
 ```
 
-민감값은 SecureString 사용을 검토한다.
+민감값은 SecureString을 사용한다. `VERTEX_CREDENTIALS_JSON`은 서비스 계정 JSON 전체를 SecureString으로 저장하고, 배포 시 EC2에서 `/opt/jobradar/secrets/vertex-credentials.json` 파일로 렌더링한다.
 
 ### 11.2 Vertex AI Credential
 
-현재 Vertex AI는 서비스 계정 JSON 파일 경로 기반이다. 신규 EC2에서는 다음 중 하나를 선택한다.
+현재 Vertex AI는 서비스 계정 JSON 파일 경로 기반이다. 신규 EC2에서는 SSM Parameter Store SecureString에 저장한 JSON을 배포 스크립트에서 파일로 렌더링한다.
 
-- S3 private bucket에 암호화 저장 후 EC2 부팅 시 다운로드
-- SSM Parameter Store SecureString에 저장 후 파일로 렌더링
-- 장기적으로는 인증 방식을 더 안전하게 개선
+현재 경로:
+
+```text
+Host path: /opt/jobradar/secrets/vertex-credentials.json
+Container path: /app/secrets/vertex-credentials.json
+Docker mount: -v /opt/jobradar/secrets:/app/secrets:ro
+VERTEX_CREDENTIALS_PATH=/app/secrets/vertex-credentials.json
+```
 
 서비스 계정 JSON은 Docker 이미지에 포함하지 않는다.
 
@@ -883,18 +1058,20 @@ JobRadar의 현재 규모에서는 Redis 데이터는 이전하지 않고, 배�
 5. [x] 백엔드 Dockerfile과 로컬 통합 검증 환경 구성
 6. [x] GitHub Actions OIDC와 ECR Push 구성
 7. [x] `linux/amd64` Git SHA 이미지 Build/Push 검증
-8. [ ] RDS MySQL 생성
-9. [ ] ElastiCache for Valkey 생성
-10. [ ] Parameter Store와 Vertex 인증정보 구성
+8. [x] RDS MySQL 생성
+9. [x] ElastiCache Serverless Valkey 생성
+10. [x] Parameter Store와 Vertex 인증정보 구성
 11. [ ] 예약 작업 분산 락과 상태 관리 구현
-12. [ ] EC2 Instance Role과 Launch Template 구성
-13. [ ] ALB, Target Group, ACM 구성
-14. [ ] Green EC2 컨테이너 실행과 실제 RDS·Valkey 연결 검증
-15. [ ] GitHub Actions Blue/Green 자동 배포 확장
-16. [ ] RDS 데이터 이관
-17. [ ] Frontend API URL, CORS, DNS 전환
-18. [ ] CloudWatch와 Rollback 검증
-19. [ ] 기존 AWS 계정 리소스 정리
+12. [x] EC2 Instance Role 구성
+13. [ ] Launch Template 구성
+14. [x] ALB, Target Group, ACM 구성
+15. [x] Green EC2 컨테이너 실행과 실제 RDS·Valkey 연결 검증
+16. [x] RDS 데이터 이관
+17. [x] Frontend API URL, CORS, DNS 전환
+18. [x] GitHub Actions Docker + SSM 자동 배포 구성
+19. [ ] GitHub Actions Blue/Green 자동 배포 확장
+20. [ ] CloudWatch와 Rollback 검증
+21. [ ] 기존 AWS 계정 EC2/RDS 정리
 
 ## 19. 주요 리스크
 
