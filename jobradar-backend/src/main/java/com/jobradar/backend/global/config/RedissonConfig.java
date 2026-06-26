@@ -14,11 +14,13 @@ public class RedissonConfig {
     public RedissonClient redissonClient(
             @Value("${spring.data.redis.host}") String host,
             @Value("${spring.data.redis.port}") int port,
+            @Value("${spring.data.redis.ssl.enabled:false}") boolean sslEnabled,
             @Value("${spring.data.redis.password:}") String password) {
 
         Config config = new Config();
+        String protocol = sslEnabled ? "rediss://" : "redis://";
         var serverConfig = config.useSingleServer()
-                .setAddress("redis://" + host + ":" + port);
+                .setAddress(protocol + host + ":" + port);
 
         if (password != null && !password.isBlank()) {
             serverConfig.setPassword(password);

@@ -25,6 +25,8 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
 
 # ===== CORS =====
 app:
