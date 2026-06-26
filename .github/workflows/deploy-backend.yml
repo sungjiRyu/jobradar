@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,26 +29,8 @@ jobs:
         run: ./gradlew build -x test
         working-directory: jobradar-backend
 
-      - name: Transfer JAR to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_KEY }}
-          source: jobradar-backend/build/libs/jobradar-backend-0.0.1-SNAPSHOT.jar
-          target: ~/
-          strip_components: 3
-
-      - name: Restart Spring Boot
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_KEY }}
-          script: sudo systemctl restart jobradar
-
   push-ecr:
-    needs: deploy
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -112,3 +94,148 @@ jobs:
           else
             echo "Pushed image digest $PUSHED_DIGEST"
           fi
+
+  deploy-green-ec2:
+    needs: push-ecr
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Create deployment script
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+          cat > deploy-backend-ssm.sh <<SCRIPT
+          bash <<'DEPLOY_SCRIPT'
+          set -Eeuo pipefail
+
+          AWS_ACCOUNT_ID="$AWS_ACCOUNT_ID"
+          AWS_REGION="$AWS_REGION"
+          ECR_REPOSITORY="$ECR_REPOSITORY"
+          IMAGE_TAG="$IMAGE_TAG"
+          SCRIPT
+
+          cat >> deploy-backend-ssm.sh <<'SCRIPT'
+
+          APP_DIR="/opt/jobradar"
+          CONTAINER_NAME="jobradar-backend"
+          PARAM_PATH="/jobradar/prod"
+          SECRETS_DIR="$APP_DIR/secrets"
+
+          IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+          mkdir -p "$APP_DIR" "$SECRETS_DIR"
+          cd "$APP_DIR"
+
+          get_param() {
+            aws ssm get-parameter \
+              --region "$AWS_REGION" \
+              --name "$PARAM_PATH/$1" \
+              --with-decryption \
+              --query 'Parameter.Value' \
+              --output text
+          }
+
+          umask 077
+          {
+            echo "SPRING_PROFILES_ACTIVE=prod"
+            echo "DB_HOST=$(get_param DB_HOST)"
+            echo "DB_USERNAME=$(get_param DB_USERNAME)"
+            echo "DB_PASSWORD=$(get_param DB_PASSWORD)"
+            echo "REDIS_HOST=$(get_param REDIS_HOST)"
+            echo "REDIS_PORT=$(get_param REDIS_PORT)"
+            echo "REDIS_SSL=$(get_param REDIS_SSL)"
+            echo "CORS_ALLOWED_ORIGINS=$(get_param CORS_ALLOWED_ORIGINS)"
+            echo "JWT_SECRET=$(get_param JWT_SECRET)"
+            echo "VERTEX_PROJECT_ID=$(get_param VERTEX_PROJECT_ID)"
+            echo "VERTEX_LOCATION=$(get_param VERTEX_LOCATION)"
+            echo "VERTEX_MODEL=$(get_param VERTEX_MODEL)"
+            echo "VERTEX_CREDENTIALS_PATH=$(get_param VERTEX_CREDENTIALS_PATH)"
+          } > app.env.tmp
+          mv app.env.tmp app.env
+
+          get_param VERTEX_CREDENTIALS_JSON > "$SECRETS_DIR/vertex-credentials.json.tmp"
+          mv "$SECRETS_DIR/vertex-credentials.json.tmp" "$SECRETS_DIR/vertex-credentials.json"
+          chmod 644 "$SECRETS_DIR/vertex-credentials.json"
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+          docker pull "$IMAGE"
+          docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+
+          docker run -d \
+            --name "$CONTAINER_NAME" \
+            --restart unless-stopped \
+            --env-file "$APP_DIR/app.env" \
+            -v "$SECRETS_DIR:/app/secrets:ro" \
+            -p 8080:8080 \
+            "$IMAGE"
+
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://localhost:8080/actuator/health; then
+              echo
+              echo "Deployment succeeded with image $IMAGE"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Health check failed. Recent container logs:"
+          docker logs --tail=200 "$CONTAINER_NAME"
+          exit 1
+          DEPLOY_SCRIPT
+          SCRIPT
+
+      - name: Send deployment command
+        id: send-command
+        env:
+          BACKEND_INSTANCE_ID: ${{ vars.BACKEND_INSTANCE_ID }}
+        run: |
+          jq -n \
+            --rawfile script deploy-backend-ssm.sh \
+            '{commands: [$script], executionTimeout: ["900"]}' > ssm-parameters.json
+
+          command_id=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --instance-ids "$BACKEND_INSTANCE_ID" \
+            --comment "Deploy JobRadar backend image ${{ github.sha }}" \
+            --parameters file://ssm-parameters.json \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "command_id=$command_id" >> "$GITHUB_OUTPUT"
+          echo "Sent SSM command $command_id"
+
+      - name: Wait for deployment result
+        env:
+          BACKEND_INSTANCE_ID: ${{ vars.BACKEND_INSTANCE_ID }}
+          COMMAND_ID: ${{ steps.send-command.outputs.command_id }}
+        run: |
+          set +e
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$BACKEND_INSTANCE_ID"
+          wait_status=$?
+          set -e
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$BACKEND_INSTANCE_ID" \
+            --query '{Status:Status,ResponseCode:ResponseCode,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json
+
+          exit "$wait_status"
