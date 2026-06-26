@@ -3,7 +3,9 @@ name: Deploy Frontend
 on:
   push:
     branches: [main]
-    paths: ['jobradar-frontend/**']
+    paths:
+      - 'jobradar-frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
 
 jobs:
   deploy:
@@ -19,7 +21,7 @@ jobs:
         run: npm ci && npm run build
         working-directory: jobradar-frontend
         env:
-          VITE_API_BASE_URL: https://jobradar.me
+          VITE_API_BASE_URL: https://api.jobradar.me
 
       - name: Upload to S3
         run: aws s3 sync dist/ s3://jobradar-frontend-448049810261-ap-northeast-2-an --delete
