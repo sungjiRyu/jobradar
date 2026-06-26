@@ -23,6 +23,7 @@ class EnvironmentVariableConfigTest {
 
         assertThat(environment.getProperty("spring.data.redis.host")).isEqualTo("localhost");
         assertThat(environment.getProperty("spring.data.redis.port", Integer.class)).isEqualTo(6379);
+        assertThat(environment.getProperty("spring.data.redis.ssl.enabled", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.cors.allowed-origins"))
                 .isEqualTo("http://localhost:5173");
     }
@@ -35,6 +36,7 @@ class EnvironmentVariableConfigTest {
                 Map.of(
                         "REDIS_HOST", "redis.internal",
                         "REDIS_PORT", "6380",
+                        "REDIS_SSL", "true",
                         "CORS_ALLOWED_ORIGINS",
                         "https://jobradar.me,https://admin.jobradar.me"
                 )
@@ -42,6 +44,7 @@ class EnvironmentVariableConfigTest {
 
         assertThat(environment.getProperty("spring.data.redis.host")).isEqualTo("redis.internal");
         assertThat(environment.getProperty("spring.data.redis.port", Integer.class)).isEqualTo(6380);
+        assertThat(environment.getProperty("spring.data.redis.ssl.enabled", Boolean.class)).isTrue();
         assertThat(environment.getProperty("app.cors.allowed-origins", String[].class))
                 .containsExactly("https://jobradar.me", "https://admin.jobradar.me");
     }
