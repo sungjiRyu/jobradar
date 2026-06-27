@@ -9,6 +9,7 @@ import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
 import com.jobradar.backend.stats.repository.StatsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.util.List;
 /**
  * 대시보드 통계 서비스
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true) // 통계는 조회 전용이므로 readOnly로 성능 최적화
@@ -81,11 +83,14 @@ public class StatsService {
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();           // 오늘 00:00:00
         LocalDateTime endOfDay = today.plusDays(1).atStartOfDay(); // 내일 00:00:00
+        log.info("[StatsToday] query range: today={}, startOfDay={}, endOfDay={}", today, startOfDay, endOfDay);
 
         long totalCount  = statsRepository.countByStatus(Job.JobStatus.ACTIVE, today);
         long todayCount  = statsRepository.countToday(Job.JobStatus.ACTIVE, startOfDay, endOfDay, today);
         long urgentCount = statsRepository.countUrgent(Job.JobStatus.ACTIVE, today, today.plusDays(7));
         long juniorCount = statsRepository.countJunior(Job.JobStatus.ACTIVE, today);
+        log.info("[StatsToday] query result: totalCount={}, todayCount={}, urgentCount={}, juniorCount={}",
+                totalCount, todayCount, urgentCount, juniorCount);
 
         return new TodayStatResponse(totalCount, todayCount, urgentCount, juniorCount);
     }
