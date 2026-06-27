@@ -5,17 +5,32 @@ import com.jobradar.backend.crawler.service.source.SaraminCrawlerService;
 import com.jobradar.backend.global.ai.AiSummaryService;
 import com.jobradar.backend.global.lock.LockAcquisitionException;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.SummaryResponse;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +38,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -42,6 +58,10 @@ import static org.mockito.Mockito.verify;
  */
 @ExtendWith(MockitoExtension.class)
 class JobServiceTest {
+
+    private static final BusinessTimeProvider FIXED_TIME_PROVIDER = new BusinessTimeProvider(
+            Clock.fixed(Instant.parse("2026-06-26T18:00:00Z"), ZoneOffset.UTC)
+    );
 
     @Mock
     private JobRepository jobRepository;
@@ -64,7 +84,8 @@ class JobServiceTest {
                 saraminCrawlerService,
                 jobkoreaCrawlerService,
                 aiSummaryService,
-                new SynchronizedRedisLockExecutor()
+                new SynchronizedRedisLockExecutor(),
+                FIXED_TIME_PROVIDER
         );
     }
 
@@ -95,6 +116,47 @@ class JobServiceTest {
     // ===== getDescription() 분기 테스트 =====
 
     @Test
+    @DisplayName("공고 검색 - 오늘 등록/마감임박 필터는 KST 기준 경계값으로 Specification을 생성")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void search_todayOnlyAndUrgent_비즈니스날짜경계조건() {
+        given(jobRepository.findAll(any(Specification.class), any(PageRequest.class))).willReturn(Page.empty());
+
+        jobService.search(null, null, null, null, null, null, true, true, PageRequest.of(0, 10));
+
+        ArgumentCaptor<Specification<Job>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(jobRepository).findAll(captor.capture(), any(PageRequest.class));
+
+        Root<Job> root = (Root<Job>) org.mockito.Mockito.mock(Root.class);
+        CriteriaQuery<?> query = org.mockito.Mockito.mock(CriteriaQuery.class);
+        CriteriaBuilder cb = org.mockito.Mockito.mock(CriteriaBuilder.class);
+        Path statusPath = org.mockito.Mockito.mock(Path.class);
+        Path deadlinePath = org.mockito.Mockito.mock(Path.class);
+        Path createdAtPath = org.mockito.Mockito.mock(Path.class);
+        Predicate predicate = org.mockito.Mockito.mock(Predicate.class);
+
+        given(root.get("status")).willReturn(statusPath);
+        given(root.get("deadline")).willReturn(deadlinePath);
+        given(root.get("createdAt")).willReturn(createdAtPath);
+        org.mockito.Mockito.doReturn(predicate).when(cb).equal(statusPath, Job.JobStatus.ACTIVE);
+        org.mockito.Mockito.doReturn(predicate).when(cb).isNull(deadlinePath);
+        org.mockito.Mockito.doReturn(predicate).when(cb).greaterThanOrEqualTo(deadlinePath, LocalDate.of(2026, 6, 27));
+        org.mockito.Mockito.doReturn(predicate).when(cb)
+                .greaterThanOrEqualTo(createdAtPath, LocalDateTime.of(2026, 6, 27, 0, 0));
+        org.mockito.Mockito.doReturn(predicate).when(cb)
+                .lessThan(createdAtPath, LocalDateTime.of(2026, 6, 28, 0, 0));
+        org.mockito.Mockito.doReturn(predicate).when(cb)
+                .between(deadlinePath, LocalDate.of(2026, 6, 27), LocalDate.of(2026, 7, 4));
+        org.mockito.Mockito.doReturn(predicate).when(cb).or(any(Predicate.class), any(Predicate.class));
+        org.mockito.Mockito.doReturn(predicate).when(cb).and(any(Predicate.class), any(Predicate.class));
+
+        captor.getValue().toPredicate(root, query, cb);
+
+        verify(cb).greaterThanOrEqualTo(createdAtPath, LocalDateTime.of(2026, 6, 27, 0, 0));
+        verify(cb).lessThan(createdAtPath, LocalDateTime.of(2026, 6, 28, 0, 0));
+        verify(cb).between(deadlinePath, LocalDate.of(2026, 6, 27), LocalDate.of(2026, 7, 4));
+    }
+
+    @Test
     @DisplayName("상세 내용 조회 - descriptionStatus = SUCCESS → 크롤러 호출 없이 즉시 반환")
     void getDescription_SUCCESS_즉시반환() {
         // given: 이미 수집된 공고 (descriptionStatus = SUCCESS)
@@ -117,6 +179,48 @@ class JobServiceTest {
         assertThat(response.getStatus()).isEqualTo("SUCCESS");
         assertThat(response.getDescription()).isEqualTo("상세 내용입니다.");
         verify(saraminCrawlerService, never()).fetchDescription(job.getSourceUrl());
+    }
+
+    @Test
+    @DisplayName("상세 내용 조회 - 마감일이 오늘이면 아직 마감으로 보지 않음")
+    void getDescription_마감일오늘_크롤링진행() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("오늘 마감 공고")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/today-deadline")
+                .sourceSite("사람인")
+                .deadline(LocalDate.of(2026, 6, 27))
+                .build();
+
+        given(jobRepository.findById(1L)).willReturn(Optional.of(job));
+        given(saraminCrawlerService.fetchDescription(job.getSourceUrl()))
+                .willReturn(DescriptionResponse.success("상세 내용"));
+
+        DescriptionResponse response = jobService.getDescription(1L);
+
+        assertThat(response.getStatus()).isEqualTo("SUCCESS");
+        verify(saraminCrawlerService).fetchDescription(job.getSourceUrl());
+    }
+
+    @Test
+    @DisplayName("상세 내용 조회 - 마감일이 어제면 CLOSED 응답")
+    void getDescription_마감일어제_CLOSED반환() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("어제 마감 공고")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/yesterday-deadline")
+                .sourceSite("사람인")
+                .deadline(LocalDate.of(2026, 6, 26))
+                .build();
+
+        given(jobRepository.findById(1L)).willReturn(Optional.of(job));
+
+        DescriptionResponse response = jobService.getDescription(1L);
+
+        assertThat(response.getStatus()).isEqualTo("CLOSED");
+        verify(saraminCrawlerService, never()).fetchDescription(any());
     }
 
     @Test
@@ -233,7 +337,8 @@ class JobServiceTest {
                 saraminCrawlerService,
                 jobkoreaCrawlerService,
                 aiSummaryService,
-                new ThrowingRedisLockExecutor()
+                new ThrowingRedisLockExecutor(),
+                FIXED_TIME_PROVIDER
         );
 
         Job job = Job.builder()
@@ -260,7 +365,8 @@ class JobServiceTest {
                 saraminCrawlerService,
                 jobkoreaCrawlerService,
                 aiSummaryService,
-                new ThrowingRedisLockExecutor()
+                new ThrowingRedisLockExecutor(),
+                FIXED_TIME_PROVIDER
         );
 
         Job job = Job.builder()
@@ -347,7 +453,8 @@ class JobServiceTest {
                 saraminCrawlerService,
                 jobkoreaCrawlerService,
                 aiSummaryService,
-                new ThrowingRedisLockExecutor()
+                new ThrowingRedisLockExecutor(),
+                FIXED_TIME_PROVIDER
         );
 
         Job job = Job.builder()
@@ -377,7 +484,8 @@ class JobServiceTest {
                 saraminCrawlerService,
                 jobkoreaCrawlerService,
                 aiSummaryService,
-                new ThrowingRedisLockExecutor()
+                new ThrowingRedisLockExecutor(),
+                FIXED_TIME_PROVIDER
         );
 
         Job initiallyLoadedJob = Job.builder()

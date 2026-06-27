@@ -1,6 +1,7 @@
 package com.jobradar.backend.crawler.service;
 
 import com.jobradar.backend.crawler.dto.CrawledJobDto;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.job.repository.JobRepository;
@@ -25,6 +26,7 @@ public class CrawledJobSaveService {
 
     private final JobRepository jobRepository;
     private final TechStackRepository techStackRepository;
+    private final BusinessTimeProvider businessTimeProvider;
 
     public boolean save(CrawledJobDto dto) {
         if (jobRepository.existsBySourceUrl(dto.sourceUrl())) {
@@ -70,18 +72,19 @@ public class CrawledJobSaveService {
             return null;
         }
         if (text.contains("내일")) {
-            return LocalDate.now().plusDays(1);
+            return businessTimeProvider.today().plusDays(1);
         }
         if (text.contains("오늘")) {
-            return LocalDate.now();
+            return businessTimeProvider.today();
         }
 
         Matcher matcher = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(text);
         if (matcher.find()) {
             int month = Integer.parseInt(matcher.group(1));
             int day = Integer.parseInt(matcher.group(2));
-            LocalDate parsed = LocalDate.of(LocalDate.now().getYear(), month, day);
-            if (parsed.isBefore(LocalDate.now())) {
+            LocalDate today = businessTimeProvider.today();
+            LocalDate parsed = LocalDate.of(today.getYear(), month, day);
+            if (parsed.isBefore(today)) {
                 parsed = parsed.plusYears(1);
             }
             return parsed;

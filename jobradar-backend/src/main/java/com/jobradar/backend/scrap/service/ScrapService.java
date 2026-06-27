@@ -2,6 +2,7 @@ package com.jobradar.backend.scrap.service;
 
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;
 import com.jobradar.backend.scrap.dto.ScrapResponse;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,6 +31,7 @@ public class ScrapService {
     private final ScrapRepository scrapRepository;
     private final UserRepository userRepository;
     private final JobRepository jobRepository;
+    private final BusinessTimeProvider businessTimeProvider;
 
     /**
      * 스크랩 추가
@@ -58,7 +59,7 @@ public class ScrapService {
 
         // 마감된 공고는 신규 스크랩 불가 — 기존 스크랩은 마이페이지에 그대로 노출됨
         if (job.getStatus() == Job.JobStatus.CLOSED
-                || (job.getDeadline() != null && job.getDeadline().isBefore(LocalDate.now()))) {
+                || (job.getDeadline() != null && job.getDeadline().isBefore(businessTimeProvider.today()))) {
             throw new CustomException(ErrorCode.SCRAP_CLOSED_JOB);
         }
 

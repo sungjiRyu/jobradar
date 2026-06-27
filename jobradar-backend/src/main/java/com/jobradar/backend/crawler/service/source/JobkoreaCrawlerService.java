@@ -3,6 +3,7 @@ package com.jobradar.backend.crawler.service.source;
 import com.jobradar.backend.crawler.dto.CrawledJobDto;
 import com.jobradar.backend.crawler.service.CrawledJobSaveService;
 import com.jobradar.backend.crawler.service.CrawlerService;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.dto.DescriptionResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ import java.util.regex.Pattern;
 public class JobkoreaCrawlerService implements CrawlerService {
 
     private final CrawledJobSaveService crawledJobSaveService;
+    private final BusinessTimeProvider businessTimeProvider;
 
     static final String BASE_URL = "https://www.jobkorea.co.kr";
 
@@ -267,18 +269,18 @@ public class JobkoreaCrawlerService implements CrawlerService {
         // "N시간 전" → 오늘 날짜 (같은 날 등록)
         Matcher hourMatcher = Pattern.compile("(\\d+)시간 전").matcher(text);
         if (hourMatcher.find()) {
-            return LocalDate.now();
+            return businessTimeProvider.today();
         }
 
         // "N일 전" → N일 전 날짜
         Matcher dayMatcher = Pattern.compile("(\\d+)일 전").matcher(text);
         if (dayMatcher.find()) {
-            return LocalDate.now().minusDays(Integer.parseInt(dayMatcher.group(1)));
+            return businessTimeProvider.today().minusDays(Integer.parseInt(dayMatcher.group(1)));
         }
 
         // "방금 전" 또는 "오늘" → 오늘 날짜
         if (text.contains("방금") || text.contains("오늘")) {
-            return LocalDate.now();
+            return businessTimeProvider.today();
         }
 
         return null;
