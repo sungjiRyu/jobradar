@@ -1,13 +1,14 @@
 package com.jobradar.backend.crawler.service.source;
 
 import com.jobradar.backend.crawler.service.CrawledJobSaveService;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -18,11 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(MockitoExtension.class)
 class JobkoreaCrawlerServiceTest {
 
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 6, 27);
+
     @Mock
     private CrawledJobSaveService crawledJobSaveService;
 
-    @InjectMocks
     private JobkoreaCrawlerService jobkoreaCrawlerService;
+
+    @BeforeEach
+    void setUp() {
+        jobkoreaCrawlerService = new JobkoreaCrawlerService(
+                crawledJobSaveService,
+                new BusinessTimeProvider(java.time.Clock.fixed(
+                        java.time.Instant.parse("2026-06-26T18:00:00Z"),
+                        java.time.ZoneOffset.UTC
+                ))
+        );
+    }
 
     @Test
     @DisplayName("게시일 파싱 - N시간 전 등록은 오늘 날짜")
@@ -38,7 +51,7 @@ class JobkoreaCrawlerServiceTest {
 
         LocalDate result = jobkoreaCrawlerService.parseListedAt(item);
 
-        assertThat(result).isEqualTo(LocalDate.now());
+        assertThat(result).isEqualTo(FIXED_TODAY);
     }
 
     @Test
@@ -55,7 +68,7 @@ class JobkoreaCrawlerServiceTest {
 
         LocalDate result = jobkoreaCrawlerService.parseListedAt(item);
 
-        assertThat(result).isEqualTo(LocalDate.now().minusDays(2));
+        assertThat(result).isEqualTo(FIXED_TODAY.minusDays(2));
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.jobradar.backend.scrap.service;
 
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.repository.JobRepository;
 import com.jobradar.backend.scrap.entity.Scrap;
@@ -15,10 +16,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * ScrapService 단위 테스트
@@ -39,6 +45,9 @@ class ScrapServiceTest {
     @Mock
     private JobRepository jobRepository;
 
+    @Mock
+    private BusinessTimeProvider businessTimeProvider;
+
     @InjectMocks
     private ScrapService scrapService;
 
@@ -55,6 +64,34 @@ class ScrapServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.SCRAP_ALREADY_EXISTS);
+    }
+
+    @Test
+    @DisplayName("스크랩 추가 실패 - 마감일이 어제면 SCRAP_CLOSED_JOB 예외")
+    void addScrap_마감일어제_예외() {
+        given(scrapRepository.existsByUserEmailAndJobId("test@example.com", 1L)).willReturn(false);
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(testUser()));
+        given(jobRepository.findById(1L)).willReturn(Optional.of(testJob(LocalDate.of(2026, 6, 26))));
+        given(businessTimeProvider.today()).willReturn(LocalDate.of(2026, 6, 27));
+
+        assertThatThrownBy(() -> scrapService.addScrap("test@example.com", 1L))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SCRAP_CLOSED_JOB);
+        verify(scrapRepository, never()).save(any(Scrap.class));
+    }
+
+    @Test
+    @DisplayName("스크랩 추가 성공 - 마감일이 오늘이면 아직 스크랩 가능")
+    void addScrap_마감일오늘_성공() {
+        given(scrapRepository.existsByUserEmailAndJobId("test@example.com", 1L)).willReturn(false);
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(testUser()));
+        given(jobRepository.findById(1L)).willReturn(Optional.of(testJob(LocalDate.of(2026, 6, 27))));
+        given(businessTimeProvider.today()).willReturn(LocalDate.of(2026, 6, 27));
+
+        assertThatCode(() -> scrapService.addScrap("test@example.com", 1L))
+                .doesNotThrowAnyException();
+        verify(scrapRepository).save(any(Scrap.class));
     }
 
     // ===== 스크랩 삭제 테스트 =====
@@ -89,5 +126,24 @@ class ScrapServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    private User testUser() {
+        return User.builder()
+                .email("test@example.com")
+                .password("password")
+                .nickname("테스터")
+                .build();
+    }
+
+    private Job testJob(LocalDate deadline) {
+        return Job.builder()
+                .company("테스트회사")
+                .title("개발자 모집")
+                .location("서울")
+                .sourceUrl("https://example.com/jobs/" + deadline)
+                .sourceSite("사람인")
+                .deadline(deadline)
+                .build();
     }
 }
