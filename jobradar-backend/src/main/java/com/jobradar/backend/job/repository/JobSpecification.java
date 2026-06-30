@@ -34,9 +34,8 @@ public class JobSpecification {
      * 스케줄러 타이밍에 의존하지 않도록 쿼리에서 직접 필터링하는 안전망
      * deadline IS NULL은 상시채용/파싱 실패 공고 → 마감 판단 불가능하므로 포함
      */
-    public static Specification<Job> deadlineNotPassed() {
+    public static Specification<Job> deadlineNotPassed(LocalDate today) {
         return (root, query, cb) -> {
-            LocalDate today = LocalDate.now();
             return cb.or(
                     cb.isNull(root.get("deadline")),
                     cb.greaterThanOrEqualTo(root.get("deadline"), today)
@@ -106,23 +105,19 @@ public class JobSpecification {
 
     /**
      * 오늘 등록된 공고 (createdAt 날짜 기준)
-     * CAST(created_at AS DATE) = TODAY
+     * DATE(createdAt) = today
      */
-    public static Specification<Job> isCreatedToday() {
-        return (root, query, cb) -> {
-            LocalDate today = LocalDate.now();
-            return cb.equal(cb.function("DATE", LocalDate.class, root.get("createdAt")), today);
-        };
+    public static Specification<Job> isCreatedToday(LocalDate today) {
+        return (root, query, cb) ->
+                cb.equal(cb.function("DATE", LocalDate.class, root.get("createdAt")), today);
     }
 
     /**
      * 마감 임박 공고 — 오늘부터 7일 이내 마감
      * deadline BETWEEN today AND today+7
      */
-    public static Specification<Job> isUrgent() {
+    public static Specification<Job> isUrgent(LocalDate today, LocalDate limit) {
         return (root, query, cb) -> {
-            LocalDate today = LocalDate.now();
-            LocalDate limit = today.plusDays(7);
             return cb.between(root.get("deadline"), today, limit);
         };
     }

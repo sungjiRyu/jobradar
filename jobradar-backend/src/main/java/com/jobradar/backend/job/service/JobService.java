@@ -7,6 +7,7 @@ import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
 import com.jobradar.backend.global.lock.LockAcquisitionException;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.dto.DescriptionResponse;
 import com.jobradar.backend.job.dto.JobDetailResponse;
 import com.jobradar.backend.job.dto.JobResponse;
@@ -37,6 +38,7 @@ public class JobService {
     private final JobkoreaCrawlerService jobkoreaCrawlerService;
     private final AiSummaryService aiSummaryService;
     private final RedisLockExecutor redisLockExecutor;
+    private final BusinessTimeProvider businessTimeProvider;
 
     // getDescription()과 getSummary()가 같은 공고 기준으로 락을 공유
     private String jobLockKey(Long jobId) {
@@ -58,8 +60,9 @@ public class JobService {
                                     boolean urgentOnly,
                                     Pageable pageable) {
         // ACTIVE 상태 + 마감일 미경과 조건은 항상 포함
+        LocalDate today = businessTimeProvider.today();
         Specification<Job> spec = JobSpecification.isActive()
-                .and(JobSpecification.deadlineNotPassed());
+                .and(JobSpecification.deadlineNotPassed(today));
 
         if (keyword != null && !keyword.isBlank()) {
             spec = spec.and(JobSpecification.hasKeyword(keyword));
@@ -80,10 +83,10 @@ public class JobService {
             spec = spec.and(JobSpecification.hasSourceSite(sourceSites));
         }
         if (todayOnly) {
-            spec = spec.and(JobSpecification.isCreatedToday());
+            spec = spec.and(JobSpecification.isCreatedToday(today));
         }
         if (urgentOnly) {
-            spec = spec.and(JobSpecification.isUrgent());
+            spec = spec.and(JobSpecification.isUrgent(today, today.plusDays(7)));
         }
 
         return jobRepository.findAll(spec, pageable).map(JobResponse::from);
@@ -181,7 +184,7 @@ public class JobService {
      */
     private boolean isClosed(Job job) {
         return job.getStatus() == Job.JobStatus.CLOSED
-                || (job.getDeadline() != null && job.getDeadline().isBefore(LocalDate.now()));
+                || (job.getDeadline() != null && job.getDeadline().isBefore(businessTimeProvider.today()));
     }
 
     /** DescriptionResponse.status(문자열) → Job.DescriptionStatus enum 변환 (CRAWL_FAILED는 호출 전에 걸러야 함) */
