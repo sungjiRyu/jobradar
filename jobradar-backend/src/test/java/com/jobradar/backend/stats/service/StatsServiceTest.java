@@ -3,6 +3,7 @@ package com.jobradar.backend.stats.service;
 import com.jobradar.backend.global.cache.DistributedCacheLoader;
 import com.jobradar.backend.global.config.CacheConfig;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
@@ -18,7 +19,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
@@ -46,6 +50,10 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class StatsServiceTest {
 
+    private static final BusinessTimeProvider FIXED_TIME_PROVIDER = new BusinessTimeProvider(
+            Clock.fixed(Instant.parse("2026-06-26T18:00:00Z"), ZoneOffset.UTC)
+    );
+
     @Mock
     private StatsRepository statsRepository;
 
@@ -62,7 +70,7 @@ class StatsServiceTest {
                 ),
                 new SynchronizedRedisLockExecutor()
         );
-        statsService = new StatsService(statsRepository, cacheLoader);
+        statsService = new StatsService(statsRepository, cacheLoader, FIXED_TIME_PROVIDER);
     }
 
     private static class SynchronizedRedisLockExecutor extends RedisLockExecutor {
@@ -174,7 +182,7 @@ class StatsServiceTest {
     void getTodayStats_정상조회() {
         // given
         given(statsRepository.countByStatus(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(1284L);
-        given(statsRepository.countToday(eq(Job.JobStatus.ACTIVE), any(), any(), any(LocalDate.class))).willReturn(47L);
+        given(statsRepository.countToday(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(47L);
         given(statsRepository.countUrgent(eq(Job.JobStatus.ACTIVE), any(LocalDate.class), any(LocalDate.class))).willReturn(12L);
         given(statsRepository.countJunior(eq(Job.JobStatus.ACTIVE), any(LocalDate.class))).willReturn(312L);
 
@@ -186,6 +194,10 @@ class StatsServiceTest {
         assertThat(result.getTodayCount()).isEqualTo(47L);
         assertThat(result.getUrgentCount()).isEqualTo(12L);
         assertThat(result.getJuniorCount()).isEqualTo(312L);
+        verify(statsRepository).countToday(
+                eq(Job.JobStatus.ACTIVE),
+                eq(LocalDate.of(2026, 6, 27))
+        );
     }
 
     // ===== 경력별 통계 테스트 =====

@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -68,12 +67,9 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT COUNT(j) FROM Job j " +
            "WHERE j.status = :status " +
-           "AND j.createdAt >= :startOfDay " +
-           "AND j.createdAt < :endOfDay " +
+           "AND FUNCTION('DATE', j.createdAt) = :today " +
            "AND (j.deadline IS NULL OR j.deadline >= :today)")
     long countToday(@Param("status") Job.JobStatus status,
-                    @Param("startOfDay") LocalDateTime startOfDay,
-                    @Param("endOfDay") LocalDateTime endOfDay,
                     @Param("today") LocalDate today);
 
     /**

@@ -1,15 +1,16 @@
 package com.jobradar.backend.crawler.service;
 
 import com.jobradar.backend.crawler.dto.CrawledJobDto;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.job.repository.JobRepository;
 import com.jobradar.backend.job.repository.TechStackRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,14 +27,27 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class CrawledJobSaveServiceTest {
 
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 6, 27);
+
     @Mock
     private JobRepository jobRepository;
 
     @Mock
     private TechStackRepository techStackRepository;
 
-    @InjectMocks
     private CrawledJobSaveService crawledJobSaveService;
+
+    @BeforeEach
+    void setUp() {
+        crawledJobSaveService = new CrawledJobSaveService(
+                jobRepository,
+                techStackRepository,
+                new BusinessTimeProvider(java.time.Clock.fixed(
+                        java.time.Instant.parse("2026-06-26T18:00:00Z"),
+                        java.time.ZoneOffset.UTC
+                ))
+        );
+    }
 
     @Test
     @DisplayName("중복 공고 스킵 - 이미 DB에 있는 URL이면 save() 호출 안 됨")
@@ -122,7 +136,7 @@ class CrawledJobSaveServiceTest {
         crawledJobSaveService.save(defaultDto("백엔드 개발자", "내일마감", false));
 
         Job job = captureSavedJob();
-        assertThat(job.getDeadline()).isEqualTo(LocalDate.now().plusDays(1));
+        assertThat(job.getDeadline()).isEqualTo(FIXED_TODAY.plusDays(1));
         assertThat(job.getDeadlineType()).isEqualTo(Job.DeadlineType.UNKNOWN);
     }
 
@@ -134,7 +148,7 @@ class CrawledJobSaveServiceTest {
         crawledJobSaveService.save(defaultDto("백엔드 개발자", "오늘마감", false));
 
         Job job = captureSavedJob();
-        assertThat(job.getDeadline()).isEqualTo(LocalDate.now());
+        assertThat(job.getDeadline()).isEqualTo(FIXED_TODAY);
         assertThat(job.getDeadlineType()).isEqualTo(Job.DeadlineType.UNKNOWN);
     }
 

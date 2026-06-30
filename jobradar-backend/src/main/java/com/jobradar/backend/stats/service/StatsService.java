@@ -2,6 +2,7 @@ package com.jobradar.backend.stats.service;
 
 import com.jobradar.backend.global.cache.DistributedCacheLoader;
 import com.jobradar.backend.global.config.CacheConfig;
+import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -29,6 +29,7 @@ public class StatsService {
 
     private final StatsRepository statsRepository;
     private final DistributedCacheLoader cacheLoader;
+    private final BusinessTimeProvider businessTimeProvider;
 
     /**
      * 기술스택별 공고 수 (상위 8개)
@@ -41,7 +42,7 @@ public class StatsService {
 
     private List<TechStackStatResponse> loadTechStackStats() {
         // PageRequest.of(0, 8): 첫 번째 페이지, 8개 제한 → SQL LIMIT 8 역할
-        return statsRepository.findTechStackStats(Job.JobStatus.ACTIVE, LocalDate.now(), PageRequest.of(0, 8));
+        return statsRepository.findTechStackStats(Job.JobStatus.ACTIVE, businessTimeProvider.today(), PageRequest.of(0, 8));
     }
 
     /**
@@ -55,7 +56,7 @@ public class StatsService {
     }
 
     private List<LocationStatResponse> loadLocationStats() {
-        List<LocationStatResponse> stats = statsRepository.findLocationStats(Job.JobStatus.ACTIVE, LocalDate.now());
+        List<LocationStatResponse> stats = statsRepository.findLocationStats(Job.JobStatus.ACTIVE, businessTimeProvider.today());
 
         // 전체 공고 수 합산
         long total = stats.stream().mapToLong(LocationStatResponse::getCount).sum();
@@ -78,12 +79,10 @@ public class StatsService {
     }
 
     private TodayStatResponse loadTodayStats() {
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();           // 오늘 00:00:00
-        LocalDateTime endOfDay = today.plusDays(1).atStartOfDay(); // 내일 00:00:00
+        LocalDate today = businessTimeProvider.today();
 
         long totalCount  = statsRepository.countByStatus(Job.JobStatus.ACTIVE, today);
-        long todayCount  = statsRepository.countToday(Job.JobStatus.ACTIVE, startOfDay, endOfDay, today);
+        long todayCount  = statsRepository.countToday(Job.JobStatus.ACTIVE, today);
         long urgentCount = statsRepository.countUrgent(Job.JobStatus.ACTIVE, today, today.plusDays(7));
         long juniorCount = statsRepository.countJunior(Job.JobStatus.ACTIVE, today);
 
@@ -100,7 +99,7 @@ public class StatsService {
     }
 
     private List<ExperienceStatResponse> loadExperienceStats() {
-        List<ExperienceStatResponse> stats = statsRepository.findExperienceStats(Job.JobStatus.ACTIVE, LocalDate.now());
+        List<ExperienceStatResponse> stats = statsRepository.findExperienceStats(Job.JobStatus.ACTIVE, businessTimeProvider.today());
 
         long total = stats.stream().mapToLong(ExperienceStatResponse::getCount).sum();
 
