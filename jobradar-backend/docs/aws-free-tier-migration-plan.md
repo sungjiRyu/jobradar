@@ -4,7 +4,7 @@
 
 ## 0. 현재 진행 현황
 
-기준일: `2026-06-27`
+기준일: `2026-06-30`
 
 운영 트래픽은 신규 AWS 계정의 ALB + EC2 Docker 백엔드로 전환됐다. 프론트엔드는 기존 AWS 계정의 S3 + CloudFront를 계속 사용하며, API 호출만 `https://api.jobradar.me`를 통해 신규 계정 ALB로 전달한다.
 
@@ -72,6 +72,8 @@ Frontend Domain: https://jobradar.me
 - [x] 프론트 smoke test 완료
 - [x] Backend GitHub Actions를 기존 JAR 배포에서 Docker + SSM 자동 배포로 전환
 - [x] 자동 배포 성공 확인
+- [x] 예약 작업 Redisson 분산 락과 Redis running/last 상태 관리 구현
+- [x] 관리자 예약 작업 상태 조회 API `GET /api/admin/scheduler/status` 추가
 
 ECR 첫 Push 결과:
 
@@ -134,16 +136,15 @@ GitHub Actions Backend
 남은 순서:
 
 1. 기존 EC2와 RDS는 하루 정도 유지하며 롤백 가능성 확보
-2. 예약 작업 분산 락과 작업 상태 관리 보강
-3. Launch Template 생성
-4. Blue/Green Target Group 2개 구성
-5. GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
-6. GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
-7. Standby Target Group health check 대기 구현
-8. ALB listener 전환 구현
-9. 기존 Blue EC2 종료 보류/종료 정책 구현
-10. 실패 시 이전 Target Group rollback 검증
-11. 기존 AWS 계정 EC2/RDS 비용 리소스 정리
+2. Launch Template 생성
+3. Blue/Green Target Group 2개 구성
+4. GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
+5. GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
+6. Standby Target Group health check 대기 구현
+7. ALB listener 전환 구현
+8. 기존 Blue EC2 종료 보류/종료 정책 구현
+9. 실패 시 이전 Target Group rollback 검증
+10. 기존 AWS 계정 EC2/RDS 비용 리소스 정리
 
 ## 1. 목표
 
@@ -764,6 +765,17 @@ scheduler:always-open-check
 
 ALB가 Green으로 전환된 뒤에도 기존 Blue에서 시작한 예약 작업은 완료될 때까지 실행될 수 있다. Blue와 Green은 같은 RDS와 ElastiCache를 사용하므로 DB 변경은 양쪽 버전과 호환되어야 한다.
 
+구현 현황:
+
+- `ScheduledJobExecutor`가 작업별 Redisson 락을 획득한 인스턴스에서만 실제 작업을 실행한다.
+- `ScheduledJobStatusService`가 Redis Hash에 실행 중 상태와 마지막 결과를 분리해 7일 TTL로 기록한다.
+  - `jobradar:scheduler:running:{job-key}`: 현재 실행 중인 작업만 기록하고, 성공/실패 시 삭제한다.
+  - `jobradar:scheduler:last:{job-key}`: `SUCCESS`, `FAILED`, `SKIPPED` 등 마지막 결과를 기록한다.
+- 관리자 수동 크롤링은 예약 일일 크롤링과 같은 `scheduler:daily-crawling` 락을 공유한다.
+- `AlwaysOpenCheckService`는 락이 실제 검사 구간 전체를 덮도록 동기 실행으로 변경됐다.
+- 배포 파이프라인은 `GET /api/admin/scheduler/status`의 `runningStatus` 또는 Redis `running` 키를 통해 `RUNNING` 작업을 확인한 뒤 기존 Blue EC2 종료를 보류할 수 있다.
+- `SKIPPED`는 `last` 키에만 기록하므로, Green 인스턴스의 스킵 결과가 Blue 인스턴스의 `RUNNING` 상태를 덮어쓰지 않는다.
+
 ## 11. 운영 비밀값 관리
 
 ### 11.1 Parameter Store
@@ -1061,7 +1073,7 @@ JobRadar의 현재 규모에서는 Redis 데이터는 이전하지 않고, 배�
 8. [x] RDS MySQL 생성
 9. [x] ElastiCache Serverless Valkey 생성
 10. [x] Parameter Store와 Vertex 인증정보 구성
-11. [ ] 예약 작업 분산 락과 상태 관리 구현
+11. [x] 예약 작업 분산 락과 상태 관리 구현
 12. [x] EC2 Instance Role 구성
 13. [ ] Launch Template 구성
 14. [x] ALB, Target Group, ACM 구성
