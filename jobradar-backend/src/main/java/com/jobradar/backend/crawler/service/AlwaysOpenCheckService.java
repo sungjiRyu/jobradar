@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +23,7 @@ import java.util.List;
  *   2. 페이지 내 "마감" 텍스트 감지           → CLOSED
  *   3. 정상 응답 + 마감 텍스트 없음           → ACTIVE 유지
  * - 공고 간 1초 sleep으로 외부 사이트 부하 분산
- * - @Async로 비동기 실행 → HTTP 요청은 즉시 반환
+ * - 스케줄러의 분산 락이 실제 검사 구간 전체를 덮도록 동기 실행
  */
 @Slf4j
 @Service
@@ -38,7 +37,6 @@ public class AlwaysOpenCheckService {
             "마감된 공고", "채용이 마감", "접수가 마감", "마감되었습니다", "종료된 공고"
     );
 
-    @Async
     public void checkAll() {
         List<Job> targets = jobRepository.findByDeadlineTypeAndStatus(
                 Job.DeadlineType.ALWAYS, Job.JobStatus.ACTIVE);

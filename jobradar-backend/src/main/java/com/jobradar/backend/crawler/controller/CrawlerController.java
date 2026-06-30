@@ -1,14 +1,19 @@
 package com.jobradar.backend.crawler.controller;
 
 import com.jobradar.backend.crawler.scheduler.CrawlerScheduler;
+import com.jobradar.backend.global.scheduler.ScheduledJobStatusResponse;
+import com.jobradar.backend.global.scheduler.ScheduledJobStatusService;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 크롤링 수동 실행 컨트롤러 (관리 기능)
@@ -25,6 +30,7 @@ public class CrawlerController {
 
     private final CrawlerScheduler crawlerScheduler;
     private final JobService jobService;
+    private final ScheduledJobStatusService scheduledJobStatusService;
 
     /**
      * POST /api/admin/crawl
@@ -59,5 +65,15 @@ public class CrawlerController {
         jobService.backfillDescriptions();
         return ResponseEntity.accepted()
                 .body("백필 작업이 백그라운드에서 시작되었습니다. 진행 상황은 서버 로그를 확인하세요.");
+    }
+
+    /**
+     * GET /api/admin/scheduler/status
+     * 예약 작업의 최근 실행 상태를 조회한다.
+     */
+    @GetMapping("/scheduler/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<ScheduledJobStatusResponse>> schedulerStatus() {
+        return ResponseEntity.ok(scheduledJobStatusService.findAll());
     }
 }

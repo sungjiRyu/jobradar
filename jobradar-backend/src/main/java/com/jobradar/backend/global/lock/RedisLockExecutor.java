@@ -17,11 +17,23 @@ public class RedisLockExecutor {
     private final RedissonClient redissonClient;
 
     public <T> T executeWithLock(String key, Supplier<T> task) {
+        return executeWithLock(key, DEFAULT_WAIT_SECONDS, -1, TimeUnit.SECONDS, task);
+    }
+
+    public <T> T executeWithLock(
+            String key,
+            long waitTime,
+            long leaseTime,
+            TimeUnit timeUnit,
+            Supplier<T> task
+    ) {
         RLock lock = redissonClient.getLock(key);
         boolean locked = false;
 
         try {
-            locked = lock.tryLock(DEFAULT_WAIT_SECONDS, TimeUnit.SECONDS);
+            locked = leaseTime > 0
+                    ? lock.tryLock(waitTime, leaseTime, timeUnit)
+                    : lock.tryLock(waitTime, timeUnit);
             if (!locked) {
                 throw new LockAcquisitionException("Redis lock acquisition timed out: " + key);
             }

@@ -3,6 +3,8 @@ package com.jobradar.backend.crawler.scheduler;
 import com.jobradar.backend.global.config.CacheConfig;
 import com.jobradar.backend.crawler.service.AlwaysOpenCheckService;
 import com.jobradar.backend.crawler.service.CrawlerService;
+import com.jobradar.backend.global.scheduler.ScheduledJobExecutor;
+import com.jobradar.backend.global.scheduler.ScheduledJobType;
 import com.jobradar.backend.job.service.JobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class CrawlerScheduler {
     private final List<CrawlerService> crawlerServices;
     private final JobService jobService;
     private final AlwaysOpenCheckService alwaysOpenCheckService;
+    private final ScheduledJobExecutor scheduledJobExecutor;
 
     /**
      * CrawlerController에서 수동 트리거 시 호출
@@ -51,9 +54,13 @@ public class CrawlerScheduler {
      */
     @Scheduled(cron = "0 0 3 * * 2", zone = "Asia/Seoul")
     public void runAlwaysOpenCheck() {
+        scheduledJobExecutor.execute(ScheduledJobType.ALWAYS_OPEN_CHECK, this::checkAlwaysOpenJobs);
+    }
+
+    private void checkAlwaysOpenJobs() {
         log.info("===== 상시채용 유효성 검사 시작 =====");
         alwaysOpenCheckService.checkAll();
-        log.info("===== 상시채용 유효성 검사 요청 완료 (백그라운드 실행 중) =====");
+        log.info("===== 상시채용 유효성 검사 완료 =====");
     }
 
     /**
@@ -68,6 +75,10 @@ public class CrawlerScheduler {
         CacheConfig.CACHE_TODAY
     }, allEntries = true)
     public void runCrawling() {
+        scheduledJobExecutor.execute(ScheduledJobType.DAILY_CRAWLING, this::collectAll);
+    }
+
+    private void collectAll() {
         log.info("===== 채용공고 수집 스케줄러 시작 =====");
 
         for (CrawlerService crawler : crawlerServices) {
@@ -99,6 +110,10 @@ public class CrawlerScheduler {
         CacheConfig.CACHE_TODAY
     }, allEntries = true)
     public void closeExpiredJobsScheduled() {
+        scheduledJobExecutor.execute(ScheduledJobType.CLOSE_EXPIRED_JOBS, this::closeExpiredJobs);
+    }
+
+    private void closeExpiredJobs() {
         log.info("===== 마감 공고 정리 스케줄러 시작 =====");
         try {
             jobService.closeExpiredJobs();
