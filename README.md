@@ -536,4 +536,30 @@ spring에서 동시성을 제어하는 방법에 대해 찾아보았습니다.
 
 ---
 
+<details>
+ <summary>🚀 운영 배포 구조</summary>
+
+### Backend
+
+백엔드는 신규 AWS 계정에서 Docker 기반으로 운영합니다.
+
+* GitHub Actions가 `main` 브랜치 변경 시 테스트와 빌드를 수행합니다.
+* 백엔드 Docker 이미지는 ECR Private Repository에 Git commit SHA 태그로 push합니다.
+* ALB는 `api.jobradar.me` 도메인으로 API 트래픽을 받고, Blue/Green Target Group 중 active Target Group으로 요청을 전달합니다.
+* 배포 시 GitHub Actions가 Launch Template으로 standby EC2를 생성하고, SSM Run Command로 새 컨테이너를 실행합니다.
+* Standby Target Group health check가 통과하면 ALB listener를 새 Target Group으로 전환합니다.
+* 실패 시 GitHub Actions rollback step이 ALB listener를 이전 Target Group으로 되돌립니다.
+
+### Scheduler
+
+Blue/Green 배포 중에는 구버전과 신버전 애플리케이션이 잠시 함께 실행될 수 있습니다. 예약 작업 중복 실행을 막기 위해 Redisson 기반 Redis 분산 락과 실행 상태 관리를 사용합니다.
+
+기존 EC2는 기본적으로 Target Group에서만 제거하고 즉시 종료하지 않습니다. 예약 작업 실행 여부를 확인한 뒤 종료하도록 `AUTO_TERMINATE_OLD_BACKEND=false`를 기본값으로 둡니다.
+
+</details>
+
+<br>
+
+---
+
 *이 프로젝트는 포트폴리오 목적으로 제작되었습니다. 크롤링은 robots.txt를 준수하며, 비상업적 학습용으로만 사용됩니다.*
