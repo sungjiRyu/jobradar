@@ -372,12 +372,18 @@ jobs:
 
       - name: Register standby target and wait healthy
         env:
+          ALB_HTTPS_LISTENER_ARN: ${{ vars.ALB_HTTPS_LISTENER_ARN }}
+          ACTIVE_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.active_tg }}
           STANDBY_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.standby_tg }}
           BACKEND_INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
         run: |
           aws elbv2 register-targets \
             --target-group-arn "$STANDBY_TARGET_GROUP_ARN" \
             --targets Id="$BACKEND_INSTANCE_ID",Port=8080
+
+          aws elbv2 modify-listener \
+            --listener-arn "$ALB_HTTPS_LISTENER_ARN" \
+            --default-actions "Type=forward,ForwardConfig={TargetGroups=[{TargetGroupArn=$ACTIVE_TARGET_GROUP_ARN,Weight=100},{TargetGroupArn=$STANDBY_TARGET_GROUP_ARN,Weight=0}],TargetGroupStickinessConfig={Enabled=false}}"
 
           aws elbv2 wait target-in-service \
             --target-group-arn "$STANDBY_TARGET_GROUP_ARN" \
