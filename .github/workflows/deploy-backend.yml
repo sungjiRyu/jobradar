@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -95,7 +99,7 @@ jobs:
             echo "Pushed image digest $PUSHED_DIGEST"
           fi
 
-  deploy-green-ec2:
+  deploy-blue-green:
     needs: push-ecr
     runs-on: ubuntu-latest
     permissions:
@@ -109,6 +113,41 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Resolve active and standby target groups
+        id: target-groups
+        env:
+          ALB_HTTPS_LISTENER_ARN: ${{ vars.ALB_HTTPS_LISTENER_ARN }}
+          BLUE_TARGET_GROUP_ARN: ${{ vars.BLUE_TARGET_GROUP_ARN }}
+          GREEN_TARGET_GROUP_ARN: ${{ vars.GREEN_TARGET_GROUP_ARN }}
+        run: |
+          listener=$(aws elbv2 describe-listeners \
+            --listener-arns "$ALB_HTTPS_LISTENER_ARN" \
+            --output json)
+
+          active_tg=$(jq -r '
+            .Listeners[0].DefaultActions[0]
+            | if .ForwardConfig then .ForwardConfig.TargetGroups[0].TargetGroupArn else .TargetGroupArn end
+          ' <<< "$listener")
+
+          if [[ "$active_tg" == "$BLUE_TARGET_GROUP_ARN" ]]; then
+            standby_tg="$GREEN_TARGET_GROUP_ARN"
+            active_color="blue"
+            standby_color="green"
+          elif [[ "$active_tg" == "$GREEN_TARGET_GROUP_ARN" ]]; then
+            standby_tg="$BLUE_TARGET_GROUP_ARN"
+            active_color="green"
+            standby_color="blue"
+          else
+            echo "Active target group $active_tg is not one of the configured blue/green target groups."
+            exit 1
+          fi
+
+          echo "active_tg=$active_tg" >> "$GITHUB_OUTPUT"
+          echo "standby_tg=$standby_tg" >> "$GITHUB_OUTPUT"
+          echo "active_color=$active_color" >> "$GITHUB_OUTPUT"
+          echo "standby_color=$standby_color" >> "$GITHUB_OUTPUT"
+          echo "Deploying new $standby_color instance. Current active target group is $active_color."
 
       - name: Create deployment script
         env:
@@ -200,10 +239,62 @@ jobs:
           DEPLOY_SCRIPT
           SCRIPT
 
+      - name: Launch standby EC2
+        id: launch
+        env:
+          BACKEND_LAUNCH_TEMPLATE_ID: ${{ vars.BACKEND_LAUNCH_TEMPLATE_ID }}
+          BACKEND_SECURITY_GROUP_ID: ${{ vars.BACKEND_SECURITY_GROUP_ID }}
+          BACKEND_SUBNET_IDS: ${{ vars.BACKEND_SUBNET_IDS }}
+          STANDBY_COLOR: ${{ steps.target-groups.outputs.standby_color }}
+        run: |
+          IFS=',' read -ra subnets <<< "$BACKEND_SUBNET_IDS"
+          if [[ "${#subnets[@]}" -eq 0 || -z "${subnets[0]}" ]]; then
+            echo "BACKEND_SUBNET_IDS must contain at least one subnet id."
+            exit 1
+          fi
+
+          subnet_index=$((GITHUB_RUN_NUMBER % ${#subnets[@]}))
+          subnet_id="${subnets[$subnet_index]}"
+          short_sha="${GITHUB_SHA:0:7}"
+
+          instance_id=$(aws ec2 run-instances \
+            --launch-template LaunchTemplateId="$BACKEND_LAUNCH_TEMPLATE_ID",Version='$Latest' \
+            --network-interfaces "DeviceIndex=0,SubnetId=$subnet_id,Groups=[$BACKEND_SECURITY_GROUP_ID],AssociatePublicIpAddress=true,DeleteOnTermination=true" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=jobradar-${STANDBY_COLOR}-${short_sha}},{Key=App,Value=jobradar-backend},{Key=Role,Value=${STANDBY_COLOR}},{Key=GitSha,Value=${GITHUB_SHA}},{Key=GitHubRunId,Value=${GITHUB_RUN_ID}}]" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+
+          echo "instance_id=$instance_id" >> "$GITHUB_OUTPUT"
+          echo "Launched standby EC2 $instance_id in $subnet_id"
+
+      - name: Wait for standby EC2 and SSM
+        env:
+          INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
+        run: |
+          aws ec2 wait instance-status-ok --instance-ids "$INSTANCE_ID"
+
+          for attempt in {1..40}; do
+            ping_status=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null || true)
+
+            if [[ "$ping_status" == "Online" ]]; then
+              echo "SSM is online for $INSTANCE_ID"
+              exit 0
+            fi
+
+            echo "Waiting for SSM agent on $INSTANCE_ID ($attempt/40). Current status: $ping_status"
+            sleep 15
+          done
+
+          echo "SSM agent did not become online for $INSTANCE_ID."
+          exit 1
+
       - name: Send deployment command
         id: send-command
         env:
-          BACKEND_INSTANCE_ID: ${{ vars.BACKEND_INSTANCE_ID }}
+          BACKEND_INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
         run: |
           jq -n \
             --rawfile script deploy-backend-ssm.sh \
@@ -222,7 +313,7 @@ jobs:
 
       - name: Wait for deployment result
         env:
-          BACKEND_INSTANCE_ID: ${{ vars.BACKEND_INSTANCE_ID }}
+          BACKEND_INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
           COMMAND_ID: ${{ steps.send-command.outputs.command_id }}
         run: |
           set +e
@@ -239,3 +330,106 @@ jobs:
             --output json
 
           exit "$wait_status"
+
+      - name: Register standby target and wait healthy
+        env:
+          STANDBY_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.standby_tg }}
+          BACKEND_INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
+        run: |
+          aws elbv2 register-targets \
+            --target-group-arn "$STANDBY_TARGET_GROUP_ARN" \
+            --targets Id="$BACKEND_INSTANCE_ID",Port=8080
+
+          aws elbv2 wait target-in-service \
+            --target-group-arn "$STANDBY_TARGET_GROUP_ARN" \
+            --targets Id="$BACKEND_INSTANCE_ID",Port=8080
+
+      - name: Switch ALB listener to standby target group
+        env:
+          ALB_HTTPS_LISTENER_ARN: ${{ vars.ALB_HTTPS_LISTENER_ARN }}
+          STANDBY_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.standby_tg }}
+        run: |
+          aws elbv2 modify-listener \
+            --listener-arn "$ALB_HTTPS_LISTENER_ARN" \
+            --default-actions Type=forward,TargetGroupArn="$STANDBY_TARGET_GROUP_ARN"
+
+      - name: Smoke test active API
+        env:
+          BACKEND_HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL }}
+        run: |
+          health_url="${BACKEND_HEALTH_URL:-https://api.jobradar.me/actuator/health}"
+
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "$health_url"; then
+              echo
+              echo "ALB switch succeeded. $health_url is healthy."
+              exit 0
+            fi
+
+            echo "Waiting for active API health check ($attempt/30)."
+            sleep 2
+          done
+
+          echo "Smoke test failed after ALB switch."
+          exit 1
+
+      - name: Roll back ALB listener on failure
+        if: failure() && steps.target-groups.outputs.active_tg != ''
+        env:
+          ALB_HTTPS_LISTENER_ARN: ${{ vars.ALB_HTTPS_LISTENER_ARN }}
+          ACTIVE_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.active_tg }}
+        run: |
+          aws elbv2 modify-listener \
+            --listener-arn "$ALB_HTTPS_LISTENER_ARN" \
+            --default-actions Type=forward,TargetGroupArn="$ACTIVE_TARGET_GROUP_ARN"
+
+      - name: Deregister previous targets
+        if: success()
+        env:
+          ACTIVE_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.active_tg }}
+        run: |
+          target_ids=$(aws elbv2 describe-target-health \
+            --target-group-arn "$ACTIVE_TARGET_GROUP_ARN" \
+            --query 'TargetHealthDescriptions[].Target.Id' \
+            --output text)
+
+          if [[ -z "$target_ids" || "$target_ids" == "None" ]]; then
+            echo "No previous targets to deregister."
+            exit 0
+          fi
+
+          targets=()
+          for target_id in $target_ids; do
+            targets+=("Id=$target_id,Port=8080")
+          done
+
+          aws elbv2 deregister-targets \
+            --target-group-arn "$ACTIVE_TARGET_GROUP_ARN" \
+            --targets "${targets[@]}"
+
+          echo "PREVIOUS_INSTANCE_IDS=$target_ids" >> "$GITHUB_ENV"
+          echo "Deregistered previous targets: $target_ids"
+
+      - name: Terminate previous EC2 instances when enabled
+        if: success() && vars.AUTO_TERMINATE_OLD_BACKEND == 'true'
+        run: |
+          if [[ -z "$PREVIOUS_INSTANCE_IDS" ]]; then
+            echo "No previous EC2 instances to terminate."
+            exit 0
+          fi
+
+          aws ec2 terminate-instances --instance-ids $PREVIOUS_INSTANCE_IDS
+
+      - name: Terminate failed standby EC2
+        if: failure() && steps.launch.outputs.instance_id != ''
+        env:
+          STANDBY_INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
+          STANDBY_TARGET_GROUP_ARN: ${{ steps.target-groups.outputs.standby_tg }}
+        run: |
+          if [[ -n "$STANDBY_TARGET_GROUP_ARN" ]]; then
+            aws elbv2 deregister-targets \
+              --target-group-arn "$STANDBY_TARGET_GROUP_ARN" \
+              --targets Id="$STANDBY_INSTANCE_ID",Port=8080 || true
+          fi
+
+          aws ec2 terminate-instances --instance-ids "$STANDBY_INSTANCE_ID"

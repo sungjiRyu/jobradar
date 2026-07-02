@@ -8,7 +8,7 @@
 
 운영 트래픽은 신규 AWS 계정의 ALB + EC2 Docker 백엔드로 전환됐다. 프론트엔드는 기존 AWS 계정의 S3 + CloudFront를 계속 사용하며, API 호출만 `https://api.jobradar.me`를 통해 신규 계정 ALB로 전달한다.
 
-현재 상태는 “신규 인프라 이관과 Docker 자동 배포 완료” 단계다. 엄밀한 의미의 ALB Target Group 기반 Blue/Green 무중단 배포는 아직 완료되지 않았고, 다음 작업에서 “배포 중에만 임시 EC2를 추가 생성하는 EC2 단위 Blue/Green” 방식으로 구현한다.
+현재 상태는 “신규 인프라 이관과 Docker 자동 배포 완료” 단계다. 엄밀한 의미의 ALB Target Group 기반 Blue/Green 무중단 배포는 아직 완료되지 않았다. 다음 작업부터는 GitHub Actions가 EC2 생성, SSM 배포, Target Group 등록, ALB 전환, rollback을 직접 제어하는 방식으로 구현한다.
 
 ### 0.1 확정 정보
 
@@ -22,7 +22,10 @@ Backend API Domain: https://api.jobradar.me
 Frontend Domain: https://jobradar.me
 현재 운영 방식: ALB + 단일 EC2 Docker 컨테이너
 현재 배포 방식: GitHub Actions + ECR + SSM Run Command 자동 배포
-다음 목표 운영 방식: ECR + Docker + 배포 중 임시 EC2 + ALB Blue/Green
+다음 목표 운영 방식: ECR + Docker + GitHub Actions + 임시 EC2 + ALB Blue/Green
+Blue Target Group: jobradar-blue-tg
+Green Target Group: jobradar-green-tg
+Launch Template: jobradar-backend-lt / lt-0fa590ffe7684378d
 ```
 
 비용 원칙:
@@ -32,6 +35,7 @@ Frontend Domain: https://jobradar.me
 - Valkey는 ElastiCache Serverless를 사용한다.
 - 평상시 Backend EC2는 1대만 유지하고, Blue/Green 배포 중에만 임시 EC2를 추가 생성한다.
 - NAT Gateway와 유료 Interface VPC Endpoint는 사용하지 않는다.
+- 배포 오케스트레이션은 GitHub Actions가 직접 제어한다.
 - 신규 계정의 `$200` 크레딧을 사용하며, 유료 리소스 생성 후에는 작업을 연속 진행해 유휴 비용을 줄인다.
 
 ### 0.2 완료된 작업
@@ -67,6 +71,11 @@ Frontend Domain: https://jobradar.me
 - [x] ACM 인증서 `jobradar.me`, `*.jobradar.me` 발급
 - [x] 기존 계정 Route 53에 `api.jobradar.me` CNAME 추가
 - [x] `https://api.jobradar.me/actuator/health` HTTP/2 200 확인
+- [x] Blue Target Group `jobradar-blue-tg` 생성
+- [x] Launch Template `jobradar-backend-lt` 생성
+- [x] GitHub Actions Role에 EC2/SSM/ELB Blue-Green 권한 추가
+- [x] GitHub Repository Variables에 Blue/Green 배포 변수 등록
+- [x] GitHub Actions Blue/Green 배포 워크플로 구현
 - [x] ALB HTTP 80 -> HTTPS 443 redirect 설정
 - [x] 프론트 API base URL을 `https://api.jobradar.me`로 전환
 - [x] 프론트 smoke test 완료
@@ -110,14 +119,16 @@ GitHub Actions Backend
   -> OIDC AssumeRole
   -> Test/Build
   -> ECR Push
-  -> SSM Run Command
-  -> EC2 Docker container 교체
-  -> /actuator/health 검증
+  -> Launch Template으로 standby EC2 생성
+  -> SSM Run Command로 standby EC2에 Docker container 실행
+  -> Standby Target Group health check 검증
+  -> ALB listener Target Group 전환
+  -> 실패 시 이전 Target Group rollback
 ```
 
 ### 0.4 다음 작업
 
-다음 작업은 ALB Target Group 기반 Blue/Green 무중단 배포 자동화다.
+다음 작업은 GitHub Actions 기반 ALB Target Group Blue/Green 무중단 배포 자동화다.
 
 채택한 방식:
 
@@ -126,25 +137,27 @@ GitHub Actions Backend
   운영 EC2 1대만 유지
 
 배포 시:
-  새 EC2 1대 임시 생성
-  새 EC2에 신규 Docker image 실행
-  Target Group health check 통과 확인
-  ALB listener를 새 Target Group으로 전환
-  기존 EC2는 관찰 후 종료
+  GitHub Actions가 새 Docker image를 ECR에 push
+  GitHub Actions가 Launch Template으로 새 EC2 생성
+  새 EC2가 SSM Ready가 되면 SSM Run Command로 신규 Docker image 실행
+  Standby Target Group health check 통과 확인
+  GitHub Actions가 ALB listener를 새 Target Group으로 전환
+  기존 EC2는 관찰 및 예약 작업 상태 확인 후 종료 또는 보류
 ```
 
 남은 순서:
 
 1. 기존 EC2와 RDS는 하루 정도 유지하며 롤백 가능성 확보
-2. Launch Template 생성
-3. Blue/Green Target Group 2개 구성
-4. GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
-5. GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
-6. Standby Target Group health check 대기 구현
-7. ALB listener 전환 구현
-8. 기존 Blue EC2 종료 보류/종료 정책 구현
-9. 실패 시 이전 Target Group rollback 검증
-10. 기존 AWS 계정 EC2/RDS 비용 리소스 정리
+2. [x] Launch Template 생성
+3. [x] Blue/Green Target Group 2개 구성
+4. [x] GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
+5. [x] GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
+6. [x] Standby Target Group health check 대기 구현
+7. [x] ALB listener 전환 구현
+8. [x] 실패 시 이전 Target Group rollback 구현
+9. [ ] 실제 `main` 배포로 end-to-end Blue/Green 1회 검증
+10. [ ] 기존 Blue EC2 종료 전 예약 작업 running 상태 확인 자동화
+11. [ ] 기존 AWS 계정 EC2/RDS 비용 리소스 정리
 
 ## 1. 목표
 
@@ -250,11 +263,11 @@ GitHub Actions Backend
 GitHub Actions
   -> OIDC AssumeRole
   -> ECR Push
-  -> 배포용 임시 EC2 생성
-  -> SSM Run Command
-  -> Standby Target Group health check
+  -> Launch Template 기반 임시 EC2 생성
+  -> SSM Run Command로 Docker container 실행
+  -> Standby Target Group에 신규 EC2 등록
   -> ALB Target Group 전환
-  -> 기존 EC2 종료
+  -> 기존 EC2 종료 또는 보류
 ```
 
 권장 도메인 구조:
@@ -554,7 +567,7 @@ Lifecycle Policy:
 GitHub Actions
   -> AWS OIDC Provider
   -> IAM Role Assume
-  -> ECR/S3/CloudFront/SSM/ALB 작업 수행
+  -> ECR/S3/CloudFront/SSM/EC2/ELB 작업 수행
 ```
 
 장점:
@@ -581,12 +594,15 @@ GitHub Actions
 12. /actuator/health 확인
 
 다음 목표:
-13. 배포용 임시 EC2 생성
-14. Standby Target Group에 새 EC2 등록
-15. Target Group health check 확인
-16. ALB listener 전환
-17. 관찰 및 예약 작업 상태 확인
-18. 기존 Blue EC2 종료
+13. Launch Template으로 임시 Green EC2 생성
+14. Green EC2 running + SSM Ready 대기
+15. SSM Run Command로 Parameter Store 기반 app.env 재생성
+16. SSM Run Command로 ECR image pull 및 Docker container 실행
+17. Standby Target Group에 Green EC2 등록
+18. Target Group health check 확인
+19. GitHub Actions가 ALB listener 전환
+20. 관찰 및 예약 작업 running 상태 확인
+21. 기존 Blue EC2 종료 또는 보류
 ```
 
 기존 JAR 기반 EC2 배포 job은 제거됐다. 기존 EC2를 중지해도 백엔드 GitHub Actions 배포가 실패하지 않는다.
@@ -610,7 +626,7 @@ VITE_API_BASE_URL=https://api.jobradar.me
 
 프론트는 기존 AWS 계정의 S3 + CloudFront에 계속 배포한다. GitHub Actions 프론트 배포는 `VITE_API_BASE_URL=https://api.jobradar.me`로 build 후 S3 sync와 CloudFront invalidation을 수행한다.
 
-## 10. Blue/Green 무중단 배포 전략
+## 10. GitHub Actions Blue/Green 무중단 배포 전략
 
 ### 10.1 기본 개념
 
@@ -631,27 +647,30 @@ ALB -> Blue Target Group -> Blue EC2
 
 배포:
 1. GitHub Actions가 새 Docker image를 ECR에 push
-2. Green EC2 생성
-3. Green EC2가 ECR에서 새 image pull
-4. Green container 실행
-5. /actuator/health 확인
-6. Green Target Group에 Green EC2 등록
-7. ALB listener를 Green Target Group으로 전환
-8. 일정 시간 모니터링
-9. 실행 중인 예약 작업이 없는지 확인
-10. 기존 Blue EC2 종료
+2. GitHub Actions가 Launch Template으로 Green EC2 생성
+3. Green EC2 running + SSM Ready 대기
+4. SSM Run Command로 Green EC2에 배포 스크립트 실행
+5. Green EC2가 ECR에서 새 image pull
+6. Green container 실행
+7. /actuator/health 확인
+8. Green Target Group health check 확인
+9. GitHub Actions가 ALB listener를 Green Target Group으로 전환
+10. 일정 시간 모니터링
+11. 실행 중인 예약 작업이 없는지 확인
+12. 기존 Blue EC2 종료 또는 보류
 ```
 
 ### 10.3 Green EC2 생성 방식
 
-Green EC2는 Launch Template으로 생성한다. 채택한 방식은 평상시 EC2 1대만 유지하고, 배포 중에만 새 EC2를 임시로 추가 생성하는 구조다.
+Green EC2는 Launch Template으로 생성한다. 채택한 방식은 평상시 EC2 1대만 유지하고, 배포 중에만 새 EC2를 임시로 추가 생성하는 구조다. GitHub Actions가 새 EC2 생성, SSM 배포, Target Group 등록, ALB listener 전환, rollback을 직접 제어한다.
 
 채택 이유:
 
 - 단일 EC2 container 교체 방식보다 무중단 성격이 강하다.
 - EC2 2대를 상시 유지하지 않아 비용을 줄일 수 있다.
 - 새 EC2에서 Docker image, SSM, Parameter Store, RDS, Valkey 연결을 검증한 뒤 ALB를 전환할 수 있다.
-- 실패 시 기존 운영 EC2와 기존 Target Group은 건드리지 않으므로 rollback이 단순하다.
+- GitHub Actions, EC2, SSM, ELB만으로 현재 AWS 계정에서 바로 구현할 수 있다.
+- 예약 작업 running 상태 확인, Blue 종료 보류, cleanup 정책을 원하는 순서로 넣을 수 있다.
 
 Launch Template에 포함할 항목:
 
@@ -663,15 +682,19 @@ Launch Template에 포함할 항목:
 - User Data
 - EBS size
 - Metadata options
+- Docker
+- AWS CLI
 
 User Data 또는 SSM Run Command가 수행할 작업:
 
 ```text
-1. ECR login
-2. Docker image pull
-3. env file 준비
-4. backend container 실행
-5. health check 대기
+1. Parameter Store에서 app.env 생성
+2. Vertex credentials JSON 파일 복원
+3. ECR login
+4. Docker image pull
+5. 기존 container 정리
+6. backend container 실행
+7. localhost /actuator/health 확인
 ```
 
 GitHub Actions Blue/Green 배포 흐름:
@@ -681,14 +704,15 @@ GitHub Actions Blue/Green 배포 흐름:
 2. 현재 ALB HTTPS listener가 바라보는 active Target Group 조회
 3. standby Target Group 결정
 4. Launch Template으로 새 EC2 생성
-5. 새 EC2 running + SSM ready 대기
+5. 새 EC2 running + SSM Ready 대기
 6. SSM Run Command로 새 EC2에 container 실행
 7. standby Target Group에 새 EC2 등록
 8. standby Target Group health check healthy 대기
 9. ALB listener를 standby Target Group으로 전환
 10. 짧은 관찰 시간 동안 health/API 확인
 11. 기존 active EC2 deregister
-12. 기존 active EC2 terminate 또는 stop
+12. `AUTO_TERMINATE_OLD_BACKEND=true`일 때만 기존 active EC2 terminate
+13. 자동 종료를 켜기 전에는 예약 작업 running 상태를 확인하고 수동 cleanup
 ```
 
 배포 중 비용:
@@ -701,7 +725,7 @@ GitHub Actions Blue/Green 배포 흐름:
 
 ### 10.4 구버전 EC2 처리
 
-배포 성공 직후 기존 Blue EC2를 바로 삭제하지 않고 짧은 관찰 시간을 둔다.
+배포 성공 직후 기존 Blue EC2를 바로 삭제하지 않고 짧은 관찰 시간을 둔다. 현재 GitHub Actions 워크플로는 기본값 `AUTO_TERMINATE_OLD_BACKEND=false`로 기존 EC2를 Target Group에서만 제거하고 인스턴스 종료는 보류한다.
 
 권장:
 
@@ -710,14 +734,20 @@ ALB 전환
   -> 5-15분 모니터링
   -> 5xx, health, 주요 API 확인
   -> 기존 Blue의 예약 작업 실행 상태 확인
-  -> 문제 없으면 기존 Blue EC2 종료
+  -> 문제 없으면 기존 Blue EC2 종료 또는 AUTO_TERMINATE_OLD_BACKEND 활성화
 ```
 
 Rollback 전략:
 
-- 전환 직후 문제 발생: ALB listener를 이전 Blue Target Group으로 되돌린다.
+- 전환 직후 문제 발생: GitHub Actions rollback step에서 ALB listener를 이전 Blue Target Group으로 되돌린다.
 - 기존 Blue 종료 후 문제 발생: 이전 ECR image tag로 새 EC2를 생성한다.
 - 기존 Blue에서 예약 작업이 실행 중이면 작업 완료까지 종료를 보류한다.
+
+주의:
+
+- 예약 작업이 `RUNNING`이면 기존 Blue EC2 terminate를 보류한다.
+- 배포 성공 후 cleanup step이 `GET /api/admin/scheduler/status`의 `runningStatus`를 확인하고 Blue EC2 종료 여부를 결정한다.
+- GitHub Actions job 실패 시 Green EC2와 standby Target Group 등록을 정리하는 cleanup step을 둔다.
 
 ### 10.5 세션/인증 상태
 
@@ -1052,6 +1082,7 @@ JobRadar의 현재 규모에서는 Redis 데이터는 이전하지 않고, 배�
 ### 17.4 Blue/Green 검증
 
 - Green EC2 생성 정상
+- Green EC2 SSM Ready 정상
 - Green container health check 정상
 - Green Target Group 등록 정상
 - ALB listener 전환 정상
@@ -1075,15 +1106,20 @@ JobRadar의 현재 규모에서는 Redis 데이터는 이전하지 않고, 배�
 10. [x] Parameter Store와 Vertex 인증정보 구성
 11. [x] 예약 작업 분산 락과 상태 관리 구현
 12. [x] EC2 Instance Role 구성
-13. [ ] Launch Template 구성
-14. [x] ALB, Target Group, ACM 구성
-15. [x] Green EC2 컨테이너 실행과 실제 RDS·Valkey 연결 검증
-16. [x] RDS 데이터 이관
-17. [x] Frontend API URL, CORS, DNS 전환
-18. [x] GitHub Actions Docker + SSM 자동 배포 구성
-19. [ ] GitHub Actions Blue/Green 자동 배포 확장
-20. [ ] CloudWatch와 Rollback 검증
-21. [ ] 기존 AWS 계정 EC2/RDS 정리
+13. [x] ALB, Target Group, ACM 구성
+14. [x] Green EC2 컨테이너 실행과 실제 RDS·Valkey 연결 검증
+15. [x] RDS 데이터 이관
+16. [x] Frontend API URL, CORS, DNS 전환
+17. [x] GitHub Actions Docker + SSM 자동 배포 구성
+18. [x] Launch Template 구성
+19. [x] Blue/Green Target Group 2개 구성
+20. [x] GitHub Actions Role에 EC2/ELB Blue-Green 권한 추가
+21. [x] GitHub Actions에서 임시 EC2 생성, SSM Ready 대기, 컨테이너 실행 구현
+22. [x] Standby Target Group health check 대기 구현
+23. [x] ALB listener 전환과 실패 rollback 구현
+24. [ ] 실제 `main` 배포로 end-to-end Blue/Green 1회 검증
+25. [ ] 예약 작업 running 상태 기반 Blue EC2 종료 보류/cleanup 자동화
+26. [ ] 기존 AWS 계정 EC2/RDS 정리
 
 ## 19. 주요 리스크
 
@@ -1143,8 +1179,8 @@ OIDC Role 권한을 너무 넓게 주면 보안상 위험하다. ECR, S3, CloudF
 - EC2는 직접 SSH 없이 SSM으로 관리
 - Redis 호환 저장소는 ElastiCache for Valkey로 분리
 - RDS는 private access만 허용
-- ALB 기반 Blue/Green 배포 가능
-- 배포 실패 시 rollback 가능
+- GitHub Actions 기반 ALB Blue/Green 배포 가능
+- 배포 실패 시 이전 Target Group rollback 가능
 - 예약 작업은 Spring Boot 내부 스케줄러로 실행
 - Blue/Green 공존 중에도 예약 작업은 한 번만 실행
 - 실행 중 예약 작업이 있는 EC2는 작업 완료 전 종료하지 않음
