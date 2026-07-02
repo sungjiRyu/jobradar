@@ -176,6 +176,45 @@ jobs:
 
           IMAGE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
+          wait_for_instance_bootstrap() {
+            if command -v cloud-init >/dev/null 2>&1; then
+              cloud-init status --wait || true
+            fi
+          }
+
+          ensure_docker() {
+            if ! command -v docker >/dev/null 2>&1; then
+              if command -v dnf >/dev/null 2>&1; then
+                dnf install -y docker
+              elif command -v yum >/dev/null 2>&1; then
+                yum install -y docker
+              elif command -v apt-get >/dev/null 2>&1; then
+                apt-get update -y
+                apt-get install -y docker.io
+              else
+                echo "No supported package manager found to install Docker."
+                exit 1
+              fi
+            fi
+
+            systemctl enable --now docker
+
+            for attempt in {1..30}; do
+              if docker info >/dev/null 2>&1; then
+                return 0
+              fi
+              echo "Waiting for Docker daemon ($attempt/30)."
+              sleep 2
+            done
+
+            echo "Docker daemon did not become ready."
+            systemctl status docker --no-pager || true
+            exit 1
+          }
+
+          wait_for_instance_bootstrap
+          ensure_docker
+
           mkdir -p "$APP_DIR" "$SECRETS_DIR"
           cd "$APP_DIR"
 
