@@ -213,6 +213,7 @@ jobradar-frontend/
 5. [N+1 문제 해결](#5-n1-문제-해결)
 6. [lock 을 이용한 동시성 제어](#6-lock-을-이용한-동시성-제어)
 7. [운영 환경 타임존 설정](#7-운영-환경-타임존-설정)
+8. [Blue/Gren 무중단 배포](#8-Blue/Green-무중단-배포)
 
 <br>
 
@@ -533,6 +534,40 @@ spring에서 동시성을 제어하는 방법에 대해 찾아보았습니다.
 
 
 <br>
+
+#### 8. Blue/Green 무중단 배포
+
+### 문제
+
+기존에는 하나의 EC2 인스턴스에서 실행 중인 컨테이너를 직접 교체했기 때문에, 배포 중 컨테이너가 중지되고 새 컨테이너가 준비되는 짧은 시간 동안 API 요청이 실패하는 문제가 있었습니다.
+이를 해결하기 위해 ALB Target Group 기반의 Blue/Green 무중단 배포 방식을 도입했습니다.
+
+```mermaid
+sequenceDiagram
+    participant Dev as main merge
+    participant GHA as GitHub Actions
+    participant ECR as Amazon ECR
+    participant EC2 as Standby EC2
+    participant SSM as SSM Run Command
+    participant TG as Standby Target Group
+    participant ALB as ALB Listener
+
+    Dev->>GHA: trigger deploy workflow
+    GHA->>ECR: build and push Docker image
+    GHA->>ALB: read current active Target Group
+    GHA->>EC2: launch standby EC2
+    GHA->>SSM: run deploy script on standby EC2
+    SSM->>ECR: pull Docker image
+    SSM->>EC2: run container
+    EC2-->>SSM: localhost health UP
+    GHA->>TG: register standby EC2
+    GHA->>ALB: active 100%, standby 0%
+    ALB->>TG: health check
+    TG-->>GHA: target healthy
+    GHA->>ALB: switch to standby 100%
+    GHA->>ALB: external health check
+    GHA->>TG: deregister previous active targets
+```
 
 ---
 
