@@ -556,7 +556,6 @@ sequenceDiagram
     SSM->>EC2: run container
     EC2-->>SSM: localhost health UP
     GHA->>TG: register standby EC2
-    GHA->>ALB: active 100%, standby 0%
     ALB->>TG: health check
     TG-->>GHA: target healthy
     GHA->>ALB: switch to standby 100%
