@@ -535,16 +535,7 @@ spring에서 동시성을 제어하는 방법에 대해 찾아보았습니다.
 
 <br>
 
-#### 8. Blue/Green 무중단 배포
-
-### 문제
-
-기존 배포방식에서는 배포진행과정동안 서버가 다운되는 문제가 있었습니다.
-
-## 해결
-
-
-
+### 8. Blue/Green 무중단 배포
 
 ```mermaid
 sequenceDiagram
@@ -572,6 +563,19 @@ sequenceDiagram
     GHA->>ALB: external health check
     GHA->>TG: deregister previous active targets
 ```
+
+#### 문제
+
+기존 배포 방식은 운영 중인 단일 EC2 인스턴스에서 애플리케이션 컨테이너를 교체하는 구조였습니다.  
+이 방식에서는 새 버전을 pull하고 기존 컨테이너를 중지한 뒤 다시 실행하는 약 1분가량 서비스 다운타임이 발생하는 문제가 있었습니다.
+
+#### 해결
+
+- 배포 중 서버가 중단되는 문제를 해결하기 위해 ALB Target Group 기반의 Blue/Green 무중단 배포를 도입했습니다.
+- Blue와 Green 두 개의 Target Group을 생성하고, ALB Listener가 현재 운영 중인 Target Group으로 트래픽을 전달하도록 구성했습니다.
+- GitHub Actions에서 새 Docker 이미지를 ECR에 push한 뒤, 현재 트래픽을 받고 있지 않은 idle Target Group을 선택합니다.
+- 새 버전의 EC2 인스턴스를 생성하고 컨테이너를 실행한 뒤, 해당 EC2를 idle Target Group에 등록합니다.
+- 새 인스턴스의 health check가 완료되면 ALB Listener를 idle Target Group으로 전환하여 트래픽을 새 버전으로 이동시킵니다.
 
 ---
 
