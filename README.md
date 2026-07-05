@@ -95,7 +95,7 @@
 <details>
  <summary>🗄 ERD</summary>
  
-<img width="932" height="1208" alt="image" src="https://github.com/user-attachments/assets/614fed61-22a5-4714-91d7-22bff650711d" />
+<img width="1228" height="1198" alt="image" src="https://github.com/user-attachments/assets/84b5e397-b743-4ea2-8eb1-d7fbd452ccb9" />
 
 </details>
 
