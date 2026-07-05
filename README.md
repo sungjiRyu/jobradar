@@ -192,7 +192,7 @@ jobradar-frontend/
 <details>
  <summary>🗄 ERD</summary>
  
-<img width="923" height="884" alt="image" src="https://github.com/user-attachments/assets/ac666745-87f4-4b23-931a-ed466e1bf39a" />
+<img width="932" height="1208" alt="image" src="https://github.com/user-attachments/assets/614fed61-22a5-4714-91d7-22bff650711d" />
 
 </details>
 
