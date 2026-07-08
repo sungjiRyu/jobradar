@@ -102,7 +102,7 @@
 <details>
  <summary>🏗 아키텍처</summary>
 
-[![Architecture](/jobRadar_arch.svg)](/jobRadar_arch.svg)
+[![Architecture](/jobRadar_arch.svg?v=1)](/jobRadar_arch.svg?v=1)
 
 </details>
 
