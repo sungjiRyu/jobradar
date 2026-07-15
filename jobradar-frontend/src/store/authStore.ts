@@ -11,12 +11,37 @@ interface AuthStore {
   logout: () => void;
 }
 
-// 새로고침 후에도 로그인 상태를 유지하기 위해 localStorage에서 user 정보를 복원
-const savedUser = localStorage.getItem("user");
-const initialUser: User | null = savedUser ? JSON.parse(savedUser) : null;
+const clearStoredAuth = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+};
+
+// 새로고침 후에도 로그인 상태를 유지하되, 토큰과 사용자 정보가 모두 있을 때만 복원
+const getInitialUser = (): User | null => {
+  const accessToken = localStorage.getItem("accessToken");
+  const savedUser = localStorage.getItem("user");
+
+  if (!accessToken || !savedUser) {
+    clearStoredAuth();
+    return null;
+  }
+
+  try {
+    const user = JSON.parse(savedUser) as User;
+    if (!user.email || !user.nickname) {
+      clearStoredAuth();
+      return null;
+    }
+    return user;
+  } catch {
+    clearStoredAuth();
+    return null;
+  }
+};
 
 const useAuthStore = create<AuthStore>((set) => ({
-  user: initialUser,
+  user: getInitialUser(),
 
   login: (user: User, accessToken: string) => {
     localStorage.setItem("accessToken", accessToken);
@@ -25,9 +50,7 @@ const useAuthStore = create<AuthStore>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+    clearStoredAuth();
     set({ user: null });
   },
 }));
