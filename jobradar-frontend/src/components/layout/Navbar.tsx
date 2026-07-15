@@ -30,11 +30,15 @@ const Navbar = () => {
     setIsNotificationOpen(false);
   }, [location.pathname]);
 
-  const fetchScraps = useCallback(async () => {
+  const fetchScraps = useCallback(async (requestUserEmail: string) => {
     try {
       const res = await getScraps();
+      if (useAuthStore.getState().user?.email !== requestUserEmail) return;
+
       setScraps(res.data.data ?? []);
     } catch {
+      if (useAuthStore.getState().user?.email !== requestUserEmail) return;
+
       setScraps([]);
     }
   }, []);
@@ -46,7 +50,7 @@ const Navbar = () => {
       return;
     }
 
-    fetchScraps();
+    fetchScraps(user?.email);
   }, [fetchScraps, user]);
 
   const urgentScraps = useMemo(
@@ -78,7 +82,7 @@ const Navbar = () => {
   };
 
   const handleNotificationToggle = () => {
-    if (!isNotificationOpen) fetchScraps();
+    if (!isNotificationOpen && user) fetchScraps(user?.email);
     setIsNotificationOpen((prev) => !prev);
   };
 
