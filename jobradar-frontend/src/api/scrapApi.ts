@@ -8,6 +8,16 @@ import api from "./axios";
 // 스크랩 상태 타입
 export type ScrapStatus = "PENDING" | "APPLIED" | "REVIEWING" | "REJECTED";
 
+export interface ScrapItem {
+  scrapId: number;
+  jobPostId: number;
+  title: string;
+  company: string;
+  deadline: string | null;
+  status: ScrapStatus;
+  createdAt: string;
+}
+
 // 스크랩 추가: POST /api/scraps
 export const addScrap = (jobPostId: number) => {
   return api.post("/api/scraps", { jobPostId });
