@@ -2,23 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMe } from "../api/userApi";
 import { getScraps, updateScrapStatus, deleteScrap } from "../api/scrapApi";
-import type { ScrapStatus } from "../api/scrapApi";
+import type { ScrapItem, ScrapStatus } from "../api/scrapApi";
 import { calcDday } from "../utils/dateUtils";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 interface UserInfo {
   email: string;
   nickname: string;
-}
-
-interface ScrapItem {
-  scrapId: number;
-  jobPostId: number;
-  title: string;
-  company: string;
-  deadline: string;
-  status: ScrapStatus;
-  createdAt: string;
 }
 
 const statusBadgeStyle: Record<ScrapStatus, string> = {
