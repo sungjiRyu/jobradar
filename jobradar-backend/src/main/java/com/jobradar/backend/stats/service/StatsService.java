@@ -8,6 +8,8 @@ import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
 import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
+import com.jobradar.backend.stats.dto.TrendingJobRankRow;
+import com.jobradar.backend.stats.dto.TrendingJobResponse;
 import com.jobradar.backend.stats.repository.StatsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -15,7 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 대시보드 통계 서비스
@@ -108,5 +114,39 @@ public class StatsService {
         }
 
         return stats;
+    }
+
+    /**
+     * 인기 공고 랭킹 Top 10
+     *
+     * 점수 = 조회수 + 스크랩 수 * 2
+     */
+    public List<TrendingJobResponse> getTrendingJobs() {
+        LocalDate today = businessTimeProvider.today();
+        List<TrendingJobRankRow> rankRows = statsRepository.findTrendingJobRankRows(
+                Job.JobStatus.ACTIVE,
+                today,
+                PageRequest.of(0, 10)
+        );
+
+        if (rankRows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> jobIds = rankRows.stream()
+                .map(TrendingJobRankRow::getJobId)
+                .toList();
+        Map<Long, Job> jobsById = statsRepository.findJobsWithTechStacksByIds(jobIds).stream()
+                .collect(Collectors.toMap(Job::getId, Function.identity()));
+
+        List<TrendingJobResponse> responses = new ArrayList<>();
+        for (int i = 0; i < rankRows.size(); i++) {
+            TrendingJobRankRow row = rankRows.get(i);
+            Job job = jobsById.get(row.getJobId());
+            if (job != null) {
+                responses.add(TrendingJobResponse.from(job, i + 1, row.getScrapCount()));
+            }
+        }
+        return responses;
     }
 }

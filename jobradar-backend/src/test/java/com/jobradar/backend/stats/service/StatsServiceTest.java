@@ -5,10 +5,13 @@ import com.jobradar.backend.global.config.CacheConfig;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
 import com.jobradar.backend.global.time.BusinessTimeProvider;
 import com.jobradar.backend.job.entity.Job;
+import com.jobradar.backend.job.entity.TechStack;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
 import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
+import com.jobradar.backend.stats.dto.TrendingJobRankRow;
+import com.jobradar.backend.stats.dto.TrendingJobResponse;
 import com.jobradar.backend.stats.repository.StatsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -29,8 +33,10 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -231,5 +237,73 @@ class StatsServiceTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    // ===== 인기 공고 랭킹 테스트 =====
+
+    @Test
+    @DisplayName("인기 공고 랭킹 - Repository 순서대로 rank와 스크랩 수를 조립")
+    void getTrendingJobs_정상조회() {
+        // given
+        List<TrendingJobRankRow> rankRows = List.of(
+                new TrendingJobRankRow(2L, 20L),
+                new TrendingJobRankRow(1L, 10L)
+        );
+        given(statsRepository.findTrendingJobRankRows(
+                eq(Job.JobStatus.ACTIVE),
+                eq(LocalDate.of(2026, 6, 27)),
+                eq(PageRequest.of(0, 10))
+        )).willReturn(rankRows);
+        given(statsRepository.findJobsWithTechStacksByIds(List.of(2L, 1L)))
+                .willReturn(List.of(
+                        trendingJob(1L, "A회사", "백엔드 개발자", 100, "Java"),
+                        trendingJob(2L, "B회사", "프론트엔드 개발자", 200, "React")
+                ));
+
+        // when
+        List<TrendingJobResponse> result = statsService.getTrendingJobs();
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getId()).isEqualTo(2L);
+        assertThat(result.get(0).getRank()).isEqualTo(1);
+        assertThat(result.get(0).getScrapCount()).isEqualTo(20L);
+        assertThat(result.get(0).getTechStacks()).containsExactly("React");
+        assertThat(result.get(1).getId()).isEqualTo(1L);
+        assertThat(result.get(1).getRank()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("인기 공고 랭킹 - 공고 없을 때 빈 리스트 반환")
+    void getTrendingJobs_빈데이터() {
+        // given
+        given(statsRepository.findTrendingJobRankRows(
+                eq(Job.JobStatus.ACTIVE),
+                any(LocalDate.class),
+                eq(PageRequest.of(0, 10))
+        )).willReturn(Collections.emptyList());
+
+        // when
+        List<TrendingJobResponse> result = statsService.getTrendingJobs();
+
+        // then
+        assertThat(result).isEmpty();
+        verify(statsRepository, never()).findJobsWithTechStacksByIds(anyList());
+    }
+
+    private Job trendingJob(Long id, String company, String title, int viewCount, String techStack) {
+        Job job = Job.builder()
+                .company(company)
+                .title(title)
+                .location("서울")
+                .experienceLevel("경력")
+                .sourceUrl("https://example.com/jobs/" + id)
+                .sourceSite("사람인")
+                .deadline(LocalDate.of(2026, 7, 31))
+                .build();
+        ReflectionTestUtils.setField(job, "id", id);
+        ReflectionTestUtils.setField(job, "viewCount", viewCount);
+        job.getTechStacks().add(TechStack.builder().name(techStack).build());
+        return job;
     }
 }

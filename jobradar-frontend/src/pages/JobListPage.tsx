@@ -6,6 +6,7 @@ import SearchFilter from "../components/job/SearchFilter";
 import type { FilterState } from "../components/job/SearchFilter";
 import JobCard from "../components/job/JobCard";
 import Pagination from "../components/job/Pagination";
+import TrendingJobsRanking from "../components/job/TrendingJobsRanking";
 import Sidebar from "../components/layout/Sidebar";
 import type { Job } from "../components/job/JobCard";
 import { getStatsToday } from "../api/statsApi";
@@ -216,6 +217,8 @@ const JobListPage = () => {
           onFilterChange={handleFilterChange}
         />
       </div>
+
+      <TrendingJobsRanking />
 
       {/* 오늘의 현황 카드 — 모바일: 2x2, lg+: 4x1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
