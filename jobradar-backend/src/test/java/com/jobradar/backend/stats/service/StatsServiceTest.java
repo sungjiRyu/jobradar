@@ -72,7 +72,8 @@ class StatsServiceTest {
                         CacheConfig.CACHE_TECH_STACKS,
                         CacheConfig.CACHE_LOCATIONS,
                         CacheConfig.CACHE_TODAY,
-                        CacheConfig.CACHE_EXPERIENCE
+                        CacheConfig.CACHE_EXPERIENCE,
+                        CacheConfig.CACHE_TRENDING_JOBS
                 ),
                 new SynchronizedRedisLockExecutor()
         );
@@ -289,6 +290,34 @@ class StatsServiceTest {
         // then
         assertThat(result).isEmpty();
         verify(statsRepository, never()).findJobsWithTechStacksByIds(anyList());
+    }
+
+    @Test
+    @DisplayName("인기 공고 랭킹 - 캐시 적중 시 Repository를 다시 호출하지 않음")
+    void getTrendingJobs_캐시적중_repository재호출없음() {
+        // given
+        List<TrendingJobRankRow> rankRows = List.of(new TrendingJobRankRow(1L, 10L));
+        given(statsRepository.findTrendingJobRankRows(
+                eq(Job.JobStatus.ACTIVE),
+                eq(LocalDate.of(2026, 6, 27)),
+                eq(PageRequest.of(0, 10))
+        )).willReturn(rankRows);
+        given(statsRepository.findJobsWithTechStacksByIds(List.of(1L)))
+                .willReturn(List.of(trendingJob(1L, "A회사", "백엔드 개발자", 100, "Java")));
+
+        // when
+        List<TrendingJobResponse> first = statsService.getTrendingJobs();
+        List<TrendingJobResponse> second = statsService.getTrendingJobs();
+
+        // then
+        assertThat(first).hasSize(1);
+        assertThat(second).hasSize(1);
+        verify(statsRepository, times(1)).findTrendingJobRankRows(
+                eq(Job.JobStatus.ACTIVE),
+                eq(LocalDate.of(2026, 6, 27)),
+                eq(PageRequest.of(0, 10))
+        );
+        verify(statsRepository, times(1)).findJobsWithTechStacksByIds(List.of(1L));
     }
 
     private Job trendingJob(Long id, String company, String title, int viewCount, String techStack) {

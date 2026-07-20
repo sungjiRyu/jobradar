@@ -17,7 +17,7 @@ import java.util.Map;
  * Redis 캐시 설정
  *
  * [TTL 전략]
- * 모든 캐시의 TTL은 24시간으로 설정
+ * 기본 캐시는 24시간, 사용자 반응 기반 랭킹 캐시는 짧은 TTL로 설정
  * 크롤링시 혹은 데이터 변경시 @CacheEvict 을 통해 refresh 한다
  *
  * [직렬화 방식]
@@ -33,6 +33,7 @@ public class CacheConfig {
     public static final String CACHE_LOCATIONS   = "stats:locations";
     public static final String CACHE_TODAY       = "stats:today";
     public static final String CACHE_EXPERIENCE  = "stats:experience";
+    public static final String CACHE_TRENDING_JOBS = "stats:trending-jobs";
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
@@ -55,6 +56,7 @@ public class CacheConfig {
         cacheConfigs.put(CACHE_LOCATIONS,   defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigs.put(CACHE_EXPERIENCE,  defaultConfig.entryTtl(Duration.ofHours(24)));
         cacheConfigs.put(CACHE_TODAY,       defaultConfig.entryTtl(Duration.ofHours(24)));
+        cacheConfigs.put(CACHE_TRENDING_JOBS, defaultConfig.entryTtl(Duration.ofMinutes(1)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

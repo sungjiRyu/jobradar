@@ -122,6 +122,10 @@ public class StatsService {
      * 점수 = 조회수 + 스크랩 수 * 2
      */
     public List<TrendingJobResponse> getTrendingJobs() {
+        return cacheLoader.getOrLoad(CacheConfig.CACHE_TRENDING_JOBS, CACHE_KEY_ALL, this::loadTrendingJobs);
+    }
+
+    private List<TrendingJobResponse> loadTrendingJobs() {
         LocalDate today = businessTimeProvider.today();
         List<TrendingJobRankRow> rankRows = statsRepository.findTrendingJobRankRows(
                 Job.JobStatus.ACTIVE,

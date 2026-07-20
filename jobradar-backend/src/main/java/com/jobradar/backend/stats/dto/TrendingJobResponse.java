@@ -1,6 +1,7 @@
 package com.jobradar.backend.stats.dto;
 
 import com.jobradar.backend.job.entity.Job;
+import com.jobradar.backend.job.entity.TechStack;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -36,7 +37,7 @@ public class TrendingJobResponse implements Serializable {
         this.location = job.getLocation();
         this.experienceLevel = job.getExperienceLevel();
         this.techStacks = job.getTechStacks().stream()
-                .map(techStack -> techStack.getName())
+                .map(TechStack::getName)
                 .toList();
         this.deadline = job.getDeadline();
         this.deadlineType = job.getDeadlineType() != null ? job.getDeadlineType().name() : null;

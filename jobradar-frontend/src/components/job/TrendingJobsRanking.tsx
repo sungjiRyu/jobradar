@@ -6,7 +6,7 @@ import {
   FiEye,
   FiTrendingUp,
 } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getTrendingJobs } from "../../api/statsApi";
 import type { TrendingJobStat } from "../../api/statsApi";
 import { calcDday } from "../../utils/dateUtils";
@@ -28,7 +28,6 @@ const formatDeadline = (deadline: string | null) => {
 };
 
 const TrendingJobsRanking = () => {
-  const navigate = useNavigate();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [jobs, setJobs] = useState<TrendingJobStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,7 @@ const TrendingJobsRanking = () => {
 
   useEffect(() => {
     fetchTrendingJobs(true);
-    
+
     // 60초마다 인기 공고 목록을 다시 불러온다.
     const intervalId = window.setInterval(
       () => fetchTrendingJobs(false),
@@ -150,10 +149,9 @@ const TrendingJobsRanking = () => {
             const deadlineLabel = formatDeadline(job.deadline);
 
             return (
-              <button
+              <Link
                 key={job.id}
-                type="button"
-                onClick={() => navigate(`/jobs/${job.id}`)}
+                to={`/jobs/${job.id}`}
                 className="group flex h-[164px] shrink-0 snap-start basis-full flex-col rounded-lg border border-[#DDDDDD] bg-white p-3 text-left transition-all hover:border-[#B8D8F4] hover:shadow-md sm:basis-[calc((100%_-_12px)/2)] lg:basis-[calc((100%_-_24px)/3)]"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -230,7 +228,7 @@ const TrendingJobsRanking = () => {
                     </span>
                   </div>
                 </div>
-              </button>
+              </Link>
             );
           })}
         </div>

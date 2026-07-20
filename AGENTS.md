@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -52,7 +52,7 @@ Transform tasks into verifiable goals:
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-```
+```text
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
 3. [Step] → verify: [check]
@@ -71,14 +71,14 @@ For any new feature or bug fix:
 - If the task is only planning, investigation, explanation, or UI mock review, an issue/branch is not required unless implementation begins.
 
 Issue title format:
-```
+```text
 [feat] Short feature summary
 [fix] Short bug summary
 [chore] Short maintenance summary
 ```
 
 Issue body format:
-```
+```text
 ## 🛠️ 작업 내용
 - [Concrete task 1]
 - [Concrete task 2]
@@ -92,14 +92,14 @@ Issue body format:
 ```
 
 Branch naming:
-```
+```text
 feat/issue-{number}-{short-kebab-summary}
 fix/issue-{number}-{short-kebab-summary}
 chore/issue-{number}-{short-kebab-summary}
 ```
 
 Example:
-```
+```text
 Issue: [feat] 인기 공고 랭킹 API 및 메인 위젯 연동
 Branch: feat/issue-123-trending-jobs-ranking
 ```
