@@ -4,6 +4,7 @@ import com.jobradar.backend.job.entity.Job;
 import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
 import com.jobradar.backend.stats.dto.TechStackStatResponse;
+import com.jobradar.backend.stats.dto.TrendingJobRankRow;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -113,4 +114,25 @@ public interface StatsRepository extends JpaRepository<Job, Long> {
            "ORDER BY COUNT(j) DESC")
     List<ExperienceStatResponse> findExperienceStats(@Param("status") Job.JobStatus status,
                                                     @Param("today") LocalDate today);
+
+    /**
+     * 인기 공고 랭킹 집계 — 마감일 지난 공고 제외
+     *
+     * 점수 = 조회수 + 스크랩 수 * 2
+     */
+    @Query("SELECT new com.jobradar.backend.stats.dto.TrendingJobRankRow(j.id, COUNT(s)) " +
+           "FROM Job j LEFT JOIN Scrap s ON s.job = j " +
+           "WHERE j.status = :status " +
+           "AND (j.deadline IS NULL OR j.deadline >= :today) " +
+           "GROUP BY j.id, j.viewCount " +
+           "ORDER BY (j.viewCount + COUNT(s) * 2) DESC, COUNT(s) DESC, j.viewCount DESC, j.id DESC")
+    List<TrendingJobRankRow> findTrendingJobRankRows(@Param("status") Job.JobStatus status,
+                                                     @Param("today") LocalDate today,
+                                                     Pageable pageable);
+
+    /**
+     * 인기 공고 카드에 필요한 기술스택을 함께 조회
+     */
+    @Query("SELECT DISTINCT j FROM Job j LEFT JOIN FETCH j.techStacks WHERE j.id IN :ids")
+    List<Job> findJobsWithTechStacksByIds(@Param("ids") List<Long> ids);
 }

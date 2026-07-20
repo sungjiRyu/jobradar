@@ -48,6 +48,25 @@ export interface ExperienceStat {
   count: number;      // 해당 경력 공고 수
 }
 
+/**
+ * 인기 공고 랭킹
+ * GET /api/stats/trending-jobs 응답 data 배열 요소 타입
+ */
+export interface TrendingJobStat {
+  id: number;
+  rank: number;
+  company: string;
+  title: string;
+  location: string;
+  experienceLevel: string;
+  techStacks: string[];
+  deadline: string | null;
+  deadlineType: string | null;
+  sourceSite: string;
+  viewCount: number;
+  scrapCount: number;
+}
+
 // ─────────────────────────────────────────────
 // API 함수
 // ─────────────────────────────────────────────
@@ -82,4 +101,12 @@ export const getStatsToday = () => {
  */
 export const getStatsExperience = () => {
   return api.get<{ data: ExperienceStat[] }>("/api/stats/experience");
+};
+
+/**
+ * 인기 공고 랭킹 Top 10
+ * 조회수 + 스크랩 수 가중치 기반으로 집계
+ */
+export const getTrendingJobs = () => {
+  return api.get<{ data: TrendingJobStat[] }>("/api/stats/trending-jobs");
 };

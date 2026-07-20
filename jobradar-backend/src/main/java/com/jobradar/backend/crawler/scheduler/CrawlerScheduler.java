@@ -72,7 +72,8 @@ public class CrawlerScheduler {
         CacheConfig.CACHE_TECH_STACKS,
         CacheConfig.CACHE_LOCATIONS,
         CacheConfig.CACHE_EXPERIENCE,
-        CacheConfig.CACHE_TODAY
+        CacheConfig.CACHE_TODAY,
+        CacheConfig.CACHE_TRENDING_JOBS
     }, allEntries = true)
     public void runCrawling() {
         scheduledJobExecutor.execute(ScheduledJobType.DAILY_CRAWLING, this::collectAll);
@@ -107,7 +108,8 @@ public class CrawlerScheduler {
         CacheConfig.CACHE_TECH_STACKS,
         CacheConfig.CACHE_LOCATIONS,
         CacheConfig.CACHE_EXPERIENCE,
-        CacheConfig.CACHE_TODAY
+        CacheConfig.CACHE_TODAY,
+        CacheConfig.CACHE_TRENDING_JOBS
     }, allEntries = true)
     public void closeExpiredJobsScheduled() {
         scheduledJobExecutor.execute(ScheduledJobType.CLOSE_EXPIRED_JOBS, this::closeExpiredJobs);

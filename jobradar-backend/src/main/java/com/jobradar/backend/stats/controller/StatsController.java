@@ -5,6 +5,7 @@ import com.jobradar.backend.stats.dto.ExperienceStatResponse;
 import com.jobradar.backend.stats.dto.LocationStatResponse;
 import com.jobradar.backend.stats.dto.TechStackStatResponse;
 import com.jobradar.backend.stats.dto.TodayStatResponse;
+import com.jobradar.backend.stats.dto.TrendingJobResponse;
 import com.jobradar.backend.stats.service.StatsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,5 +47,11 @@ public class StatsController {
     @GetMapping("/experience")
     public ApiResponse<List<ExperienceStatResponse>> getExperienceStats() {
         return ApiResponse.ok(statsService.getExperienceStats());
+    }
+
+    /** GET /api/stats/trending-jobs - 인기 공고 랭킹 Top 10 */
+    @GetMapping("/trending-jobs")
+    public ApiResponse<List<TrendingJobResponse>> getTrendingJobs() {
+        return ApiResponse.ok(statsService.getTrendingJobs());
     }
 }
