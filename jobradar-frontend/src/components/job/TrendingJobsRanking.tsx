@@ -84,9 +84,6 @@ const TrendingJobsRanking = () => {
               TOP {TRENDING_LIMIT}
             </span>
           </div>
-          <p className="mt-1.5 text-[13px] text-[#888780]">
-            조회와 스크랩이 많은 공고 TOP 10
-          </p>
         </div>
 
         <div className="hidden items-center gap-1 sm:flex">
