@@ -26,6 +26,9 @@ class EnvironmentVariableConfigTest {
         assertThat(environment.getProperty("spring.data.redis.ssl.enabled", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.cors.allowed-origins"))
                 .isEqualTo("http://localhost:5173");
+        assertThat(environment.getProperty("ai.base-url"))
+                .isEqualTo("https://api.groq.com/openai/v1/chat/completions");
+        assertThat(environment.getProperty("ai.model")).isEqualTo("openai/gpt-oss-120b");
     }
 
     @Test
@@ -37,6 +40,8 @@ class EnvironmentVariableConfigTest {
                         "REDIS_HOST", "redis.internal",
                         "REDIS_PORT", "6380",
                         "REDIS_SSL", "true",
+                        "GROQ_API_KEY", "test-groq-key",
+                        "AI_MODEL", "openai/gpt-oss-20b",
                         "CORS_ALLOWED_ORIGINS",
                         "https://jobradar.me,https://admin.jobradar.me"
                 )
@@ -47,6 +52,8 @@ class EnvironmentVariableConfigTest {
         assertThat(environment.getProperty("spring.data.redis.ssl.enabled", Boolean.class)).isTrue();
         assertThat(environment.getProperty("app.cors.allowed-origins", String[].class))
                 .containsExactly("https://jobradar.me", "https://admin.jobradar.me");
+        assertThat(environment.getProperty("ai.api-key")).isEqualTo("test-groq-key");
+        assertThat(environment.getProperty("ai.model")).isEqualTo("openai/gpt-oss-20b");
     }
 
     private StandardEnvironment loadEnvironment(

@@ -42,7 +42,7 @@ public class Job {
     private DescriptionStatus descriptionStatus;
 
     @Column(columnDefinition = "TEXT")
-    private String summary;       // AI 요약 (Gemini API, 최초 조회 시 생성)
+    private String summary;       // AI 요약 (최초 조회 시 생성)
 
     @Column(nullable = false, length = 50)
     private String location;      // 근무 지역 (예: 서울, 판교)
@@ -154,7 +154,7 @@ public class Job {
         this.descriptionStatus = descriptionStatus;
     }
 
-    /** AI 요약 저장 — 최초 상세 조회 시 Gemini API 결과를 저장 */
+    /** AI 요약 저장 — 최초 상세 조회 시 AI API 결과를 저장 */
     public void updateSummary(String summary) {
         this.summary = summary;
     }

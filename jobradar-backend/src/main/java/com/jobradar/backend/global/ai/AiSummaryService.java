@@ -1,18 +1,19 @@
 package com.jobradar.backend.global.ai;
 
-import com.google.auth.oauth2.GoogleCredentials;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** Vertex AI (Gemini) 채용공고 AI 요약 서비스 */
+/** Groq 채용공고 AI 요약 서비스 */
 @Slf4j
 @Service
 public class AiSummaryService {
@@ -45,59 +46,40 @@ public class AiSummaryService {
             %s
             """;
 
-    @Value("${vertex.project-id:}")
-    private String projectId;
+    @Value("${ai.api-key:${GROQ_API_KEY:${AI_API_KEY:}}}")
+    private String apiKey;
 
-    @Value("${vertex.location:us-central1}")
-    private String location;
+    @Value("${ai.base-url:${AI_BASE_URL:https://api.groq.com/openai/v1/chat/completions}}")
+    private String apiUrl;
 
-    @Value("${vertex.model:gemini-2.5-flash}")
+    @Value("${ai.model:${AI_MODEL:openai/gpt-oss-120b}}")
     private String model;
-
-    @Value("${vertex.credentials-path:}")
-    private String credentialsPath;
-
-    private GoogleCredentials credentials;
-    private String vertexUrl;
 
     private final RestClient restClient = RestClient.create();
 
-    /**
-     * 서비스 계정 JSON으로 GoogleCredentials 초기화
-     * credentials-path가 없으면 warn 로그만 남기고 건너뜀 (요약 기능 비활성화)
-     */
     @PostConstruct
     public void init() {
-        if (credentialsPath == null || credentialsPath.isBlank()) {
-            log.warn("[Vertex] credentials-path가 설정되지 않아 AI 요약을 사용할 수 없습니다.");
+        apiKey = resolveApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("[Groq] api-key가 설정되지 않아 AI 요약을 사용할 수 없습니다.");
             return;
         }
-        try {
-            credentials = GoogleCredentials
-                    .fromStream(new FileInputStream(credentialsPath))
-                    .createScoped("https://www.googleapis.com/auth/cloud-platform");
-            vertexUrl = String.format(
-                    "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
-                    location, projectId, location, model);
-            log.info("[Vertex] 서비스 계정 인증 초기화 완료. url={}", vertexUrl);
-        } catch (IOException e) {
-            log.error("[Vertex] 서비스 계정 JSON 로드 실패: {}", e.getMessage());
-        }
+        log.info("[Groq] AI 요약 초기화 완료. model={}", model);
     }
 
     /**
      * 채용공고 description을 받아 구조화된 JSON 문자열 반환
      *
      * @param description 공고 전체 텍스트
-     * @return JSON 문자열 (credentials 없거나 실패 시 null)
+     * @return JSON 문자열 (api-key 없거나 실패 시 null)
      */
-    public String summarize(String description) {
-        if (credentials == null) {
-            log.warn("[Vertex] credentials가 초기화되지 않아 요약을 건너뜁니다.");
-            return null;
+    public AiSummaryResult summarize(String description) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("[Groq] api-key가 설정되지 않아 요약을 건너뜁니다.");
+            return AiSummaryResult.failed();
         }
         if (description == null || description.length() < 50) {
-            return null;
+            return AiSummaryResult.failed();
         }
 
         String trimmed = description.length() > 3000
@@ -105,56 +87,57 @@ public class AiSummaryService {
                 : description;
 
         Map<String, Object> requestBody = Map.of(
-                "contents", List.of(
+                "model", model,
+                "messages", List.of(
                         Map.of(
                                 "role", "user",
-                                "parts", List.of(Map.of("text", PROMPT_TEMPLATE.formatted(trimmed)))
+                                "content", PROMPT_TEMPLATE.formatted(trimmed)
                         )
-                )
+                ),
+                "temperature", 0.1
         );
 
         try {
-            // 토큰 만료 시 자동 갱신 후 Bearer 헤더에 첨부
-            credentials.refreshIfExpired();
-            String token = credentials.getAccessToken().getTokenValue();
-
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.post()
-                    .uri(vertexUrl)
+                    .uri(apiUrl)
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
+                    .header("Authorization", "Bearer " + apiKey)
                     .body(requestBody)
                     .retrieve()
                     .body(Map.class);
 
-            if (response == null) return null;
+            if (response == null) return AiSummaryResult.failed();
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
-            if (candidates == null || candidates.isEmpty()) return null;
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+            if (choices == null || choices.isEmpty()) return AiSummaryResult.failed();
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-            if (content == null) return null;
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            if (message == null) return AiSummaryResult.failed();
 
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-            if (parts == null || parts.isEmpty()) return null;
-
-            String result = (String) parts.get(0).get("text");
+            String result = (String) message.get("content");
             String json = stripJsonCodeBlock(result);
-            log.info("[Vertex] JSON 정리 완료 ({}자)", json != null ? json.length() : 0);
-            return json;
+            log.info("[Groq] JSON 정리 완료. model={}, length={}", model, json != null ? json.length() : 0);
+            return json == null ? AiSummaryResult.failed() : AiSummaryResult.success(json);
 
+        } catch (RestClientResponseException e) {
+            int statusCode = e.getStatusCode().value();
+            if (statusCode == 429 || statusCode == 498) {
+                log.warn("[Groq] AI 요약 용량 제한: status={}, model={}", statusCode, model);
+                return AiSummaryResult.capacityLimit(statusCode);
+            }
+            log.error("[Groq] API 호출 실패: status={}, message={}", statusCode, e.getMessage());
+            return AiSummaryResult.failed(statusCode);
         } catch (Exception e) {
-            log.error("[Vertex] API 호출 실패: {}", e.getMessage());
-            return null;
+            log.error("[Groq] API 호출 실패: {}", e.getMessage());
+            return AiSummaryResult.failed();
         }
     }
 
     /**
      * LLM 응답에서 ```json ... ``` 코드블록 래퍼 제거
-     * Gemini가 순수 JSON 대신 마크다운으로 감싸서 반환하는 경우 대응
      */
     private String stripJsonCodeBlock(String text) {
         if (text == null) return null;
@@ -167,5 +150,54 @@ public class AiSummaryService {
             }
         }
         return trimmed;
+    }
+
+    private String resolveApiKey() {
+        if (apiKey != null && !apiKey.isBlank()) {
+            return apiKey;
+        }
+
+        String groqApiKey = readEnvFileValue("GROQ_API_KEY");
+        if (groqApiKey != null && !groqApiKey.isBlank()) {
+            return groqApiKey;
+        }
+
+        return readEnvFileValue("AI_API_KEY");
+    }
+
+    private String readEnvFileValue(String key) {
+        for (Path envPath : List.of(Path.of(".env.local"), Path.of("..", ".env.local"))) {
+            try {
+                if (!Files.isRegularFile(envPath)) {
+                    continue;
+                }
+
+                for (String line : Files.readAllLines(envPath)) {
+                    String trimmed = line.strip();
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        continue;
+                    }
+
+                    int separator = trimmed.indexOf('=');
+                    if (separator < 1 || !trimmed.substring(0, separator).strip().equals(key)) {
+                        continue;
+                    }
+
+                    return stripQuotes(trimmed.substring(separator + 1).strip());
+                }
+            } catch (IOException e) {
+                log.warn("[Groq] .env.local 읽기 실패: {}", e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    private String stripQuotes(String value) {
+        if ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 }

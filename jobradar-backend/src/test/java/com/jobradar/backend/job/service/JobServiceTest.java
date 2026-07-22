@@ -2,6 +2,7 @@ package com.jobradar.backend.job.service;
 
 import com.jobradar.backend.crawler.service.source.JobkoreaCrawlerService;
 import com.jobradar.backend.crawler.service.source.SaraminCrawlerService;
+import com.jobradar.backend.global.ai.AiSummaryResult;
 import com.jobradar.backend.global.ai.AiSummaryService;
 import com.jobradar.backend.global.lock.LockAcquisitionException;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
@@ -417,7 +418,7 @@ class JobServiceTest {
         given(jobRepository.findById(100L)).willReturn(Optional.of(job));
         given(aiSummaryService.summarize(any())).willAnswer(invocation -> {
             Thread.sleep(50);
-            return "{\"header\":{\"summary\":\"요약 결과\"}}";
+            return AiSummaryResult.success("{\"header\":{\"summary\":\"요약 결과\"}}");
         });
 
         // when: 5개 스레드 동시 출발
@@ -442,6 +443,55 @@ class JobServiceTest {
 
         // then: 같은 공고 요약 요청이 겹쳐도 AI 호출은 1번만 수행됨
         verify(aiSummaryService, times(1)).summarize(any());
+    }
+
+    @Test
+    @DisplayName("AI 요약 용량 제한 - failureReason을 반환하고 요약을 저장하지 않는다")
+    void getSummary_AI요약용량제한_failureReason반환() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("AI 요약 용량 제한 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-capacity")
+                .sourceSite("사람인")
+                .description("AI 요약 테스트를 위해 충분히 긴 상세 내용입니다. 주요업무와 자격요건이 포함된 텍스트라고 가정합니다.")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+
+        given(jobRepository.findById(104L)).willReturn(Optional.of(job));
+        given(aiSummaryService.summarize(any())).willReturn(AiSummaryResult.capacityLimit(429));
+
+        SummaryResponse response = jobService.getSummary(104L);
+
+        assertThat(response.getSummary()).isNull();
+        assertThat(response.getFailureReason()).isEqualTo(SummaryResponse.AI_CAPACITY_LIMIT);
+        assertThat(response.getErrorCode()).isEqualTo(429);
+        verify(jobRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("AI 요약 재생성 - 기존 summary가 공백이면 AI 요청을 다시 보낸다")
+    void getSummary_공백요약_AI재요청() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("공백 요약 재생성 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-blank")
+                .sourceSite("사람인")
+                .description("AI 요약 테스트를 위해 충분히 긴 상세 내용입니다. 주요업무와 자격요건이 포함된 텍스트라고 가정합니다.")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+        job.updateSummary("   ");
+
+        given(jobRepository.findById(105L)).willReturn(Optional.of(job));
+        given(aiSummaryService.summarize(any()))
+                .willReturn(AiSummaryResult.success("{\"header\":{\"summary\":\"재생성 요약\"}}"));
+
+        SummaryResponse response = jobService.getSummary(105L);
+
+        assertThat(response.getSummary()).isEqualTo("{\"header\":{\"summary\":\"재생성 요약\"}}");
+        verify(aiSummaryService).summarize(any());
+        verify(jobRepository).save(job);
     }
 
     @Test
