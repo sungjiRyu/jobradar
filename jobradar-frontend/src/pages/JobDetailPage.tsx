@@ -47,6 +47,7 @@ interface JobSummaryResponse {
   imageOnly: boolean;
   closed: boolean;
   inProgress?: boolean;
+  failureReason?: "AI_CAPACITY_LIMIT" | null;
 }
 
 // ─────────────────────────────────────────────
@@ -124,6 +125,9 @@ const JobDetailPage = () => {
     | null
   >(null);
   const [aiSummaryFailed, setAiSummaryFailed] = useState(false); // AI 요약만 실패한 경우
+  const [aiFailureReason, setAiFailureReason] = useState<
+    "AI_CAPACITY_LIMIT" | null
+  >(null);
   const [loadingStatus, setLoadingStatus] = useState<"crawling" | "ai" | null>(
     null,
   );
@@ -187,6 +191,7 @@ const JobDetailPage = () => {
       imageOnly: false,
       closed: false,
       inProgress: true,
+      failureReason: null,
     };
   };
 
@@ -194,6 +199,7 @@ const JobDetailPage = () => {
   // initialStatus: DB에서 읽어온 descriptionStatus (SUCCESS면 description fetch 생략)
   const fetchSummaryFlow = async (initialStatus: "SUCCESS" | null) => {
     setAiSummaryFailed(false);
+    setAiFailureReason(null);
     setSummary(undefined);
     startDots();
 
@@ -231,9 +237,11 @@ const JobDetailPage = () => {
         // getSummary 내부 lazy fetch에서 IMAGE로 확인된 경우
         setDescStatus("IMAGE");
       } else {
+        setAiFailureReason(data.failureReason ?? null);
         setAiSummaryFailed(true);
       }
     } catch {
+      setAiFailureReason(null);
       setAiSummaryFailed(true);
     } finally {
       stopDots();
@@ -244,6 +252,7 @@ const JobDetailPage = () => {
   // AI 요약만 재시도 (description은 이미 SUCCESS 상태)
   const retryAiSummary = async () => {
     setAiSummaryFailed(false);
+    setAiFailureReason(null);
     setSummary(undefined);
     startDots();
     setLoadingStatus("ai");
@@ -257,9 +266,11 @@ const JobDetailPage = () => {
       } else if (data.imageOnly) {
         setDescStatus("IMAGE");
       } else {
+        setAiFailureReason(data.failureReason ?? null);
         setAiSummaryFailed(true);
       }
     } catch {
+      setAiFailureReason(null);
       setAiSummaryFailed(true);
     } finally {
       stopDots();
@@ -484,7 +495,9 @@ const JobDetailPage = () => {
       {aiSummaryFailed && (
         <div className="bg-white rounded-lg border border-[#DDDDDD] p-6 mb-6 text-center">
           <p className="text-[13px] text-[#888780] mb-3">
-            상세 내용을 불러오지 못했습니다.
+            {aiFailureReason === "AI_CAPACITY_LIMIT"
+              ? "현재 AI 요약 요청이 많아 잠시 후 다시 시도해주세요."
+              : "상세 내용을 불러오지 못했습니다."}
           </p>
           <button
             onClick={retryAiSummary}

@@ -446,6 +446,30 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("AI 요약 용량 제한 - failureReason을 반환하고 요약을 저장하지 않는다")
+    void getSummary_AI요약용량제한_failureReason반환() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("AI 요약 용량 제한 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-capacity")
+                .sourceSite("사람인")
+                .description("AI 요약 테스트를 위해 충분히 긴 상세 내용입니다. 주요업무와 자격요건이 포함된 텍스트라고 가정합니다.")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+
+        given(jobRepository.findById(104L)).willReturn(Optional.of(job));
+        given(aiSummaryService.summarize(any())).willReturn(AiSummaryResult.capacityLimit(429));
+
+        SummaryResponse response = jobService.getSummary(104L);
+
+        assertThat(response.getSummary()).isNull();
+        assertThat(response.getFailureReason()).isEqualTo(SummaryResponse.AI_CAPACITY_LIMIT);
+        assertThat(response.getErrorCode()).isEqualTo(429);
+        verify(jobRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("summary 락 획득 실패 - 아직 처리 중이면 aiFailed 대신 inProgress 반환")
     void getSummary_락획득실패_진행중반환() {
         jobService = new JobService(

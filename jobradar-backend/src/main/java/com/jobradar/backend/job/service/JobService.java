@@ -364,12 +364,16 @@ public class JobService {
         // SUCCESS → AI 요약
         try {
             AiSummaryResult result = aiSummaryService.summarize(job.getDescription());
+            if (result.capacityLimited()) {
+                return SummaryResponse.aiCapacityLimited(result.errorCode());
+            }
             if (result.summary() != null) {
                 job.updateSummary(result.summary());
                 jobRepository.save(job);
                 log.info("[JobService] AI 요약 완료: jobId={}", jobId);
                 return SummaryResponse.success(result.summary());
             }
+            return SummaryResponse.aiFailed(result.errorCode());
         } catch (Exception e) {
             log.warn("[JobService] AI 요약 실패: jobId={}, error={}", jobId, e.getMessage());
         }

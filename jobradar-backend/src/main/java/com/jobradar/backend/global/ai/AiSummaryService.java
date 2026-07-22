@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -121,6 +122,14 @@ public class AiSummaryService {
             log.info("[Groq] JSON 정리 완료. model={}, length={}", model, json != null ? json.length() : 0);
             return json == null ? AiSummaryResult.failed() : AiSummaryResult.success(json);
 
+        } catch (RestClientResponseException e) {
+            int statusCode = e.getStatusCode().value();
+            if (statusCode == 429 || statusCode == 498) {
+                log.warn("[Groq] AI 요약 용량 제한: status={}, model={}", statusCode, model);
+                return AiSummaryResult.capacityLimit(statusCode);
+            }
+            log.error("[Groq] API 호출 실패: status={}, message={}", statusCode, e.getMessage());
+            return AiSummaryResult.failed(statusCode);
         } catch (Exception e) {
             log.error("[Groq] API 호출 실패: {}", e.getMessage());
             return AiSummaryResult.failed();
