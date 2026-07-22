@@ -470,6 +470,31 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("AI 요약 재생성 - 기존 summary가 공백이면 AI 요청을 다시 보낸다")
+    void getSummary_공백요약_AI재요청() {
+        Job job = Job.builder()
+                .company("테스트회사")
+                .title("공백 요약 재생성 테스트")
+                .location("서울")
+                .sourceUrl("https://www.saramin.co.kr/summary-blank")
+                .sourceSite("사람인")
+                .description("AI 요약 테스트를 위해 충분히 긴 상세 내용입니다. 주요업무와 자격요건이 포함된 텍스트라고 가정합니다.")
+                .descriptionStatus(Job.DescriptionStatus.SUCCESS)
+                .build();
+        job.updateSummary("   ");
+
+        given(jobRepository.findById(105L)).willReturn(Optional.of(job));
+        given(aiSummaryService.summarize(any()))
+                .willReturn(AiSummaryResult.success("{\"header\":{\"summary\":\"재생성 요약\"}}"));
+
+        SummaryResponse response = jobService.getSummary(105L);
+
+        assertThat(response.getSummary()).isEqualTo("{\"header\":{\"summary\":\"재생성 요약\"}}");
+        verify(aiSummaryService).summarize(any());
+        verify(jobRepository).save(job);
+    }
+
+    @Test
     @DisplayName("summary 락 획득 실패 - 아직 처리 중이면 aiFailed 대신 inProgress 반환")
     void getSummary_락획득실패_진행중반환() {
         jobService = new JobService(

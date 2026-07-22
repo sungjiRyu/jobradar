@@ -291,7 +291,7 @@ public class JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
 
-        if (job.getSummary() != null) {
+        if (hasUsableSummary(job.getSummary())) {
             return SummaryResponse.success(job.getSummary());
         }
 
@@ -315,8 +315,12 @@ public class JobService {
         }
     }
 
+    private boolean hasUsableSummary(String summary) {
+        return summary != null && !summary.isBlank();
+    }
+
     private SummaryResponse summaryResponseAfterLockContention(Job job) {
-        if (job.getSummary() != null) {
+        if (hasUsableSummary(job.getSummary())) {
             return SummaryResponse.success(job.getSummary());
         }
         if (isClosed(job)) {
@@ -334,7 +338,7 @@ public class JobService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOB_NOT_FOUND));
 
-        if (job.getSummary() != null) {
+        if (hasUsableSummary(job.getSummary())) {
             return SummaryResponse.success(job.getSummary());
         }
         if (isClosed(job)) {

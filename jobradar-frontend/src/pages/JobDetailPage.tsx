@@ -62,6 +62,10 @@ const parseSummary = (raw: string): JobSummaryJson | null => {
   }
 };
 
+const hasUsableSummary = (raw: string | null | undefined): raw is string => {
+  return raw !== null && raw !== undefined && raw.trim().length > 0;
+};
+
 const LOCK_RETRY_DELAY_MS = 1500;
 const MAX_LOCK_RETRY_COUNT = 5;
 
@@ -287,7 +291,7 @@ const JobDetailPage = () => {
         setJob(jobData);
 
         // DB에 summary가 이미 있으면 바로 사용
-        if (jobData.summary !== null) {
+        if (hasUsableSummary(jobData.summary)) {
           setSummary(jobData.summary);
           return;
         }
