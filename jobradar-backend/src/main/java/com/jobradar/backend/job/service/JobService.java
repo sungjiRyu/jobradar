@@ -2,6 +2,7 @@ package com.jobradar.backend.job.service;
 
 import com.jobradar.backend.crawler.service.source.JobkoreaCrawlerService;
 import com.jobradar.backend.crawler.service.source.SaraminCrawlerService;
+import com.jobradar.backend.global.ai.AiSummaryResult;
 import com.jobradar.backend.global.ai.AiSummaryService;
 import com.jobradar.backend.global.exception.CustomException;
 import com.jobradar.backend.global.exception.ErrorCode;
@@ -362,12 +363,12 @@ public class JobService {
 
         // SUCCESS → AI 요약
         try {
-            String summary = aiSummaryService.summarize(job.getDescription());
-            if (summary != null) {
-                job.updateSummary(summary);
+            AiSummaryResult result = aiSummaryService.summarize(job.getDescription());
+            if (result.summary() != null) {
+                job.updateSummary(result.summary());
                 jobRepository.save(job);
                 log.info("[JobService] AI 요약 완료: jobId={}", jobId);
-                return SummaryResponse.success(summary);
+                return SummaryResponse.success(result.summary());
             }
         } catch (Exception e) {
             log.warn("[JobService] AI 요약 실패: jobId={}, error={}", jobId, e.getMessage());

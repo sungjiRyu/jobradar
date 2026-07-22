@@ -39,6 +39,12 @@ jwt:
   access-expiration: 900000     # 15분
   refresh-expiration: 604800000 # 7일
 
+# ===== AI Summary =====
+ai:
+  base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1/chat/completions}
+  api-key: ${GROQ_API_KEY:${AI_API_KEY:}}
+  model: ${AI_MODEL:openai/gpt-oss-120b}
+
 # ===== Server =====
 server:
   port: 8080

@@ -2,6 +2,7 @@ package com.jobradar.backend.job.service;
 
 import com.jobradar.backend.crawler.service.source.JobkoreaCrawlerService;
 import com.jobradar.backend.crawler.service.source.SaraminCrawlerService;
+import com.jobradar.backend.global.ai.AiSummaryResult;
 import com.jobradar.backend.global.ai.AiSummaryService;
 import com.jobradar.backend.global.lock.LockAcquisitionException;
 import com.jobradar.backend.global.lock.RedisLockExecutor;
@@ -417,7 +418,7 @@ class JobServiceTest {
         given(jobRepository.findById(100L)).willReturn(Optional.of(job));
         given(aiSummaryService.summarize(any())).willAnswer(invocation -> {
             Thread.sleep(50);
-            return "{\"header\":{\"summary\":\"요약 결과\"}}";
+            return AiSummaryResult.success("{\"header\":{\"summary\":\"요약 결과\"}}");
         });
 
         // when: 5개 스레드 동시 출발
