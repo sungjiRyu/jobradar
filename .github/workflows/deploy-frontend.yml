@@ -22,7 +22,6 @@ jobs:
         working-directory: jobradar-frontend
         env:
           VITE_API_BASE_URL: https://api.jobradar.me
-          VITE_GA4_MEASUREMENT_ID: ${{ vars.GA4_MEASUREMENT_ID }}
 
       - name: Upload to S3
         run: aws s3 sync dist/ s3://jobradar-frontend-448049810261-ap-northeast-2-an --delete
