@@ -2,13 +2,11 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
-import AnalyticsPageTracker from "./components/common/AnalyticsPageTracker";
 import AppRouter from "./router";
 
 const App = () => {
   return (
     <BrowserRouter>
-      <AnalyticsPageTracker />
       <div className="min-h-screen bg-[#F5F5F5] flex flex-col">
         <Navbar />
         <main className="flex-1">
