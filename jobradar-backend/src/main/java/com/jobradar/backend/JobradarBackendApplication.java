@@ -3,7 +3,6 @@ package com.jobradar.backend;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * @EnableScheduling
@@ -15,12 +14,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * - 백필 API가 HTTP 요청 스레드를 막지 않고 백그라운드에서 실행되도록 사용
  */
 @SpringBootApplication
-@EnableScheduling
 @EnableAsync
 public class JobradarBackendApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(JobradarBackendApplication.class, args);
+		var context = SpringApplication.run(JobradarBackendApplication.class, args);
+		if (context.getEnvironment().matchesProfiles("batch")) {
+			System.exit(SpringApplication.exit(context));
+		}
 	}
 
 }

@@ -60,7 +60,7 @@ class ScheduledJobExecutorTest {
         }).when(redisLockExecutor).executeWithLock(
                 eq(ScheduledJobType.DAILY_CRAWLING.lockKey()),
                 anyLong(),
-                eq(ScheduledJobType.DAILY_CRAWLING.maxExpectedDuration().toSeconds()),
+                eq(-1L),
                 eq(TimeUnit.SECONDS),
                 any()
         );
@@ -94,7 +94,7 @@ class ScheduledJobExecutorTest {
         }).when(redisLockExecutor).executeWithLock(
                 eq(ScheduledJobType.CLOSE_EXPIRED_JOBS.lockKey()),
                 anyLong(),
-                eq(ScheduledJobType.CLOSE_EXPIRED_JOBS.maxExpectedDuration().toSeconds()),
+                eq(-1L),
                 eq(TimeUnit.SECONDS),
                 any()
         );
@@ -129,7 +129,7 @@ class ScheduledJobExecutorTest {
                 .when(redisLockExecutor).executeWithLock(
                         eq(ScheduledJobType.ALWAYS_OPEN_CHECK.lockKey()),
                         anyLong(),
-                        eq(ScheduledJobType.ALWAYS_OPEN_CHECK.maxExpectedDuration().toSeconds()),
+                        eq(-1L),
                         eq(TimeUnit.SECONDS),
                         any()
                 );

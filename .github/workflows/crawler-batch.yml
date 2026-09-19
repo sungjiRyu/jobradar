@@ -1,0 +1,96 @@
+name: Crawler Batch
+
+on:
+  schedule:
+    - cron: '0 15 * * *'  # KST 매일 00:00 마감 처리
+    - cron: '0 18 * * *'  # KST 매일 03:00 수집
+    - cron: '30 18 * * 0' # KST 월요일 03:30 상시채용 검사
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 실행할 작업
+        required: true
+        type: choice
+        options:
+          - daily-crawling
+          - close-expired-jobs
+          - always-open-check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crawler-batch
+  cancel-in-progress: false
+
+jobs:
+  batch:
+    # 수동 검증 후 변수 true로 예약 활성화. 이전 전 자동 수집 방지.
+    if: github.event_name == 'workflow_dispatch' || vars.CRAWLER_BATCH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: jobradar-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build batch application
+        run: ./gradlew bootJar --no-daemon
+      - name: Select job
+        id: job
+        env:
+          REQUESTED_JOB: ${{ inputs.job }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [[ -n "$REQUESTED_JOB" ]]; then
+            job="$REQUESTED_JOB"
+          else
+            case "$SCHEDULE" in
+              '0 15 * * *') job=close-expired-jobs ;;
+              '0 18 * * *') job=daily-crawling ;;
+              '30 18 * * 0') job=always-open-check ;;
+              *) echo 'Unknown schedule'; exit 1 ;;
+            esac
+          fi
+          echo "name=$job" >> "$GITHUB_OUTPUT"
+      - name: Run batch
+        env:
+          SPRING_PROFILES_ACTIVE: prod,cloud,batch
+          DB_HOST: ${{ vars.AIVEN_MYSQL_HOST }}
+          DB_PORT: ${{ vars.AIVEN_MYSQL_PORT }}
+          DB_NAME: defaultdb
+          DB_USERNAME: avnadmin
+          DB_PASSWORD: ${{ secrets.AIVEN_MYSQL_PASSWORD }}
+          DB_CA_CERT: ${{ secrets.AIVEN_MYSQL_CA_CERT }}
+          REDIS_HOST: ${{ vars.AIVEN_VALKEY_HOST }}
+          REDIS_PORT: ${{ vars.AIVEN_VALKEY_PORT }}
+          REDIS_USERNAME: default
+          REDIS_PASSWORD: ${{ secrets.AIVEN_VALKEY_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          CORS_ALLOWED_ORIGINS: https://jobradar.me
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX_HOST: ${{ vars.PINECONE_INDEX_HOST }}
+          PINECONE_INDEX_NAME: ${{ vars.PINECONE_INDEX_NAME }}
+          PINECONE_NAMESPACE: ${{ vars.PINECONE_NAMESPACE }}
+          APP_INSTANCE_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+          BATCH_JOB: ${{ steps.job.outputs.name }}
+        run: |
+          for name in DB_HOST DB_PORT DB_PASSWORD DB_CA_CERT REDIS_HOST REDIS_PORT REDIS_PASSWORD JWT_SECRET; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing configuration: $name"
+              exit 1
+            fi
+          done
+          umask 077
+          export DB_CA_CERT_PATH="$RUNNER_TEMP/aiven-mysql-ca.pem"
+          printf '%s\n' "$DB_CA_CERT" > "$DB_CA_CERT_PATH"
+          unset DB_CA_CERT
+          jars=(build/libs/*.jar)
+          export APP_JAR_PATH="${jars[0]}"
+          sh deploy/start.sh "--batch.job=$BATCH_JOB"

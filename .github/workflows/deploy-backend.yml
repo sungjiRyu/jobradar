@@ -34,6 +34,7 @@ jobs:
         working-directory: jobradar-backend
 
   push-ecr:
+    if: vars.BACKEND_DEPLOY_TARGET != 'render'
     needs: test
     runs-on: ubuntu-latest
     permissions:
