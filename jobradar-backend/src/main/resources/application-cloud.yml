@@ -1,5 +1,7 @@
 # prod,cloud: Render와 GitHub Actions에서 공유하는 Aiven 연결 설정
 spring:
+  main:
+    lazy-initialization: ${SPRING_MAIN_LAZY_INITIALIZATION:true}
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT:10494}/${DB_NAME:defaultdb}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sslMode=VERIFY_IDENTITY
     hikari:
@@ -17,5 +19,8 @@ spring:
         enabled: true
 
 app:
+  redisson:
+    threads: ${REDISSON_THREADS:2}
+    netty-threads: ${REDISSON_NETTY_THREADS:2}
   scheduling:
     enabled: false

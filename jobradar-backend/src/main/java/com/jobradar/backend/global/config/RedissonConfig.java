@@ -16,9 +16,13 @@ public class RedissonConfig {
             @Value("${spring.data.redis.port}") int port,
             @Value("${spring.data.redis.ssl.enabled:false}") boolean sslEnabled,
             @Value("${spring.data.redis.password:}") String password,
-            @Value("${spring.data.redis.username:}") String username) {
+            @Value("${spring.data.redis.username:}") String username,
+            @Value("${app.redisson.threads:16}") int threads,
+            @Value("${app.redisson.netty-threads:32}") int nettyThreads) {
 
         Config config = new Config();
+        config.setThreads(threads);
+        config.setNettyThreads(nettyThreads);
         String protocol = sslEnabled ? "rediss://" : "redis://";
         var serverConfig = config.useSingleServer()
                 .setAddress(protocol + host + ":" + port);
