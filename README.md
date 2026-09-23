@@ -103,8 +103,9 @@
 </details>
 
 <details>
- <summary>🏗 아키텍처</summary>
-
+ <summary><del>🏗 아키텍처</del></summary>
+ Render 및 Aiven으로 이전
+ 
 [![Architecture](/jobRadar_arch.svg?v=1)](/jobRadar_arch.svg?v=1)
 
 </details>
