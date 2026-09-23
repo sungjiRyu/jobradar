@@ -22,8 +22,10 @@ WORKDIR /app
 
 COPY --from=builder --chown=spring:spring /workspace/build/libs/*.jar app.jar
 
+COPY --chown=spring:spring deploy/start.sh /app/start.sh
+
 USER spring:spring
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["sh", "/app/start.sh"]

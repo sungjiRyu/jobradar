@@ -4,7 +4,7 @@ spring:
 
   # ===== MySQL (환경변수로 주입) =====
   datasource:
-    url: jdbc:mysql://${DB_HOST}:3306/job_radar?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME:job_radar}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -25,6 +25,8 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
       ssl:
         enabled: ${REDIS_SSL:false}
 
@@ -45,9 +47,19 @@ ai:
   api-key: ${GROQ_API_KEY:${AI_API_KEY:}}
   model: ${AI_MODEL:openai/gpt-oss-120b}
 
+# ===== RAG / Pinecone integrated embedding =====
+rag:
+  pinecone:
+    api-key: ${PINECONE_API_KEY:}
+    index-host: ${PINECONE_INDEX_HOST:}
+    index-name: ${PINECONE_INDEX_NAME:}
+    namespace: ${PINECONE_NAMESPACE:job-posts}
+    api-version: ${PINECONE_API_VERSION:2025-10}
+
 # ===== Server =====
 server:
-  port: 8080
+  address: 0.0.0.0
+  port: ${PORT:8080}
 
 # ===== Actuator =====
 management:
