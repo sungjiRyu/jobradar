@@ -13,6 +13,9 @@
 <details>
  <summary> 📋 Version History</summary>
 
+### v1.1.0 (2026-09-23)
+ -  [chore] aws -> render, aiven 서버이전
+
 ### v1.0.3 (2026-06-03)
  -  [fix] API 중복 호출 및 캐시 스탬피드 방어 로직 작성
 
