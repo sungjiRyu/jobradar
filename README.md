@@ -13,6 +13,9 @@
 <details>
  <summary> 📋 Version History</summary>
 
+### v1.1.0 (2026-09-23)
+ -  [chore] aws -> render, aiven 서버이전
+
 ### v1.0.3 (2026-06-03)
  -  [fix] API 중복 호출 및 캐시 스탬피드 방어 로직 작성
 
@@ -100,8 +103,9 @@
 </details>
 
 <details>
- <summary>🏗 아키텍처</summary>
-
+ <summary><del>🏗 아키텍처</del></summary>
+ Render 및 Aiven으로 이전
+ 
 [![Architecture](/jobRadar_arch.svg?v=1)](/jobRadar_arch.svg?v=1)
 
 </details>

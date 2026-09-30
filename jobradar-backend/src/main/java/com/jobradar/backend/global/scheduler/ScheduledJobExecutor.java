@@ -25,6 +25,9 @@ public class ScheduledJobExecutor {
     @Value("${APP_INSTANCE_ID:${HOSTNAME:local}}")
     private String instanceId;
 
+    @Value("${app.batch.fail-on-lock-contention:false}")
+    private boolean failOnLockContention;
+
     public void execute(ScheduledJobType jobType, Runnable task) {
         LocalDateTime startedAt = businessTimeProvider.now();
 
@@ -32,7 +35,7 @@ public class ScheduledJobExecutor {
             redisLockExecutor.executeWithLock(
                     jobType.lockKey(),
                     LOCK_WAIT_SECONDS,
-                    jobType.maxExpectedDuration().toSeconds(),
+                    -1,
                     TimeUnit.SECONDS,
                     () -> {
                         runWithStatus(jobType, task, startedAt);
@@ -43,6 +46,9 @@ public class ScheduledJobExecutor {
             log.info("[Scheduler] {} 작업이 이미 다른 인스턴스에서 실행 중입니다. instanceId={}",
                     jobType.displayName(), instanceId);
             statusService.markSkipped(jobType, instanceId, businessTimeProvider.now());
+            if (failOnLockContention) {
+                throw e;
+            }
         } catch (ScheduledJobTaskException e) {
             throw e.asRuntimeException();
         }

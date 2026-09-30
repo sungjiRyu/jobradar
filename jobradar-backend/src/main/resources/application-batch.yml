@@ -1,0 +1,9 @@
+spring:
+  main:
+    web-application-type: none
+
+app:
+  scheduling:
+    enabled: false
+  batch:
+    fail-on-lock-contention: true

@@ -3,11 +3,11 @@ package com.jobradar.backend.global.config;
 import com.jobradar.backend.global.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,7 +29,6 @@ import java.util.List;
  * 4. CORS 허용 (프론트엔드 ↔ 백엔드 통신)
  */
 @Configuration
-@EnableWebSecurity
 @EnableMethodSecurity   // 컨트롤러의 @PreAuthorize 사용을 위해 활성화
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -37,6 +36,7 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
 
     @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             CorsConfigurationSource corsConfigurationSource) throws Exception {
