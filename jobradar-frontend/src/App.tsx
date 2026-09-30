@@ -3,6 +3,7 @@ import { Toaster } from "react-hot-toast";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AppRouter from "./router";
+import ChatWidget from "./components/chat/ChatWidget";
 
 const App = () => {
   return (
@@ -14,6 +15,7 @@ const App = () => {
         </main>
         <Footer />
       </div>
+      <ChatWidget />
       {/* 전역 토스트 — 프로젝트 톤앤매너(흰 카드 + 옅은 보더) */}
       <Toaster
         position="top-center"

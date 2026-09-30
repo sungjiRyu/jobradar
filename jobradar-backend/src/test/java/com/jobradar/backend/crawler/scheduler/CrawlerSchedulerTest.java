@@ -5,6 +5,7 @@ import com.jobradar.backend.crawler.service.CrawlerService;
 import com.jobradar.backend.global.scheduler.ScheduledJobExecutor;
 import com.jobradar.backend.global.scheduler.ScheduledJobType;
 import com.jobradar.backend.job.service.JobService;
+import com.jobradar.backend.rag.index.JobIndexingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,13 +22,30 @@ class CrawlerSchedulerTest {
     private final JobService jobService = mock(JobService.class);
     private final AlwaysOpenCheckService alwaysOpenCheckService = mock(AlwaysOpenCheckService.class);
     private final ScheduledJobExecutor scheduledJobExecutor = mock(ScheduledJobExecutor.class);
+    private final JobIndexingService jobIndexingService = mock(JobIndexingService.class);
 
     private final CrawlerScheduler crawlerScheduler = new CrawlerScheduler(
             List.of(crawlerService),
             jobService,
             alwaysOpenCheckService,
-            scheduledJobExecutor
+            scheduledJobExecutor,
+            jobIndexingService
     );
+
+    @Test
+    @DisplayName("수집 완료 후 Pinecone 변경분을 동기화한다")
+    void runCrawling_synchronizesIndexAfterCollecting() {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return null;
+        }).when(scheduledJobExecutor).execute(any(), any());
+
+        crawlerScheduler.runCrawling();
+
+        var order = org.mockito.Mockito.inOrder(crawlerService, jobIndexingService);
+        order.verify(crawlerService).collect();
+        order.verify(jobIndexingService).synchronizeIfConfigured();
+    }
 
     @Test
     @DisplayName("예약 크롤링은 DAILY_CRAWLING 락으로 실행된다")

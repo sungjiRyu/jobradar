@@ -25,6 +25,19 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
      */
     boolean existsBySourceUrl(String sourceUrl);
 
+    /** RAG 인덱싱용 활성 공고 페이지 조회 */
+    Page<Job> findByStatusOrderByIdAsc(Job.JobStatus status, Pageable pageable);
+
+    /** RAG 검색 품질 시험용 최신 활성 공고 조회 */
+    Page<Job> findByStatusOrderByIdDesc(Job.JobStatus status, Pageable pageable);
+
+    /** Pinecone 검색 결과를 실제 활성 공고와 대조 */
+    List<Job> findAllByIdInAndStatus(List<Long> ids, Job.JobStatus status);
+
+    /** Pinecone에서 제거할 공고를 찾기 위한 활성 공고 ID 조회 */
+    @Query("SELECT j.id FROM Job j WHERE j.status = :status")
+    List<Long> findIdsByStatus(@Param("status") Job.JobStatus status);
+
     /** 복합 조건 검색 쿼리 (키워드/지역/경력/기술스택) */
     @Query(value = "SELECT DISTINCT j FROM Job j " +
                    "LEFT JOIN j.techStacks ts " +

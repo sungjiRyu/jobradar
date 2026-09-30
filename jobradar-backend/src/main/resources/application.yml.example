@@ -45,6 +45,15 @@ ai:
   api-key: ${GROQ_API_KEY:${AI_API_KEY:}}
   model: ${AI_MODEL:openai/gpt-oss-120b}
 
+# ===== RAG / Pinecone integrated embedding =====
+rag:
+  pinecone:
+    api-key: ${PINECONE_API_KEY:}
+    index-host: ${PINECONE_INDEX_HOST:}
+    index-name: ${PINECONE_INDEX_NAME:jobradar-jobs}
+    namespace: ${PINECONE_NAMESPACE:job-posts}
+    api-version: ${PINECONE_API_VERSION:2025-10}
+
 # ===== Server =====
 server:
   port: 8080

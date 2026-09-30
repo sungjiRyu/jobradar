@@ -43,6 +43,10 @@ services:
       AI_BASE_URL: https://api.groq.com/openai/v1/chat/completions
       AI_MODEL: openai/gpt-oss-120b
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST:-}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-}
+      PINECONE_NAMESPACE: ${PINECONE_NAMESPACE:-job-posts}
     depends_on:
       mysql:
         condition: service_healthy

@@ -10,6 +10,8 @@ public enum ErrorCode {
     // 공통
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
+    CHAT_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "챗봇 서비스가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해 주세요."),
 
     // 회원
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 회원입니다."),

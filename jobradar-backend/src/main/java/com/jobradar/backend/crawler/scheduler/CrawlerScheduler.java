@@ -6,6 +6,7 @@ import com.jobradar.backend.crawler.service.CrawlerService;
 import com.jobradar.backend.global.scheduler.ScheduledJobExecutor;
 import com.jobradar.backend.global.scheduler.ScheduledJobType;
 import com.jobradar.backend.job.service.JobService;
+import com.jobradar.backend.rag.index.JobIndexingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,6 +38,7 @@ public class CrawlerScheduler {
     private final JobService jobService;
     private final AlwaysOpenCheckService alwaysOpenCheckService;
     private final ScheduledJobExecutor scheduledJobExecutor;
+    private final JobIndexingService jobIndexingService;
 
     /**
      * CrawlerController에서 수동 트리거 시 호출
@@ -94,6 +96,7 @@ public class CrawlerScheduler {
         }
 
         log.info("===== 채용공고 수집 스케줄러 완료 =====");
+        jobIndexingService.synchronizeIfConfigured();
     }
 
     /**

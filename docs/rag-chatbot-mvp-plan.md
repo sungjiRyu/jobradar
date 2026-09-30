@@ -1,5 +1,13 @@
 # 제목·목록 메타데이터 기반 RAG 채용공고 챗봇 MVP 구현 계획
 
+## 2026-09-30 구현 복원 및 통합
+
+- 이전 커밋 `0028069b`의 챗봇 API, Pinecone 검색·인덱싱, Groq 응답 생성, 플로팅 위젯과 테스트를 복원했다.
+- 최신 `main`의 Render·Aiven 배포 설정을 유지하고, 크롤링 완료 후 Pinecone 변경분 동기화를 연결했다.
+- `/api/chat`은 비로그인 사용자도 이용할 수 있으며, 인덱싱·검색 평가 관리자 API는 관리자 권한을 요구한다.
+- 현재 API는 질문 하나씩 처리한다. 화면의 이전 대화는 다음 질문의 LLM 입력에 포함되지 않는다.
+- 전체 인덱싱과 외부 API 실동작, 브라우저 UI 검증은 별도로 진행한다.
+
 > GitHub Issue: [#150](https://github.com/sungjiRyu/jobradar/issues/150)
 > Branch: `feat/issue-150-rag-chatbot-mvp`
 
